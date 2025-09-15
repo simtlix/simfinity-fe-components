@@ -1,3 +1,5 @@
+"use client";
+
 // Re-export all components with proper client directive
 export { default as EntityForm } from './EntityForm';
 export { default as EntityTable } from './EntityTable';

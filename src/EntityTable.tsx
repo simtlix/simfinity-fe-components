@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { gql, useApolloClient, useQuery } from "@apollo/client";
 import { Box, CircularProgress, Paper, Typography, Button, Stack, IconButton, Tooltip } from "@mui/material";

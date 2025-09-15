@@ -1,3 +1,5 @@
+"use client";
+
 // Client-side components and hooks
 export { default as EntityForm } from './EntityForm';
 export { default as EntityTable } from './EntityTable';

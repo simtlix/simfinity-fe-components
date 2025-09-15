@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import { Stack, Button } from "@mui/material";
 import type { GridFilterModel } from "@mui/x-data-grid";
