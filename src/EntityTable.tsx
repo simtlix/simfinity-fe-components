@@ -29,7 +29,7 @@ function buildPaginatedListQuery(listField: string, selection: string, sortBlock
 
 type Row = Record<string, unknown>;
 
-export default function EntityTable({ listField }: EntityTableProps) {
+function EntityTable({ listField }: EntityTableProps) {
   const client = useApolloClient();
   const { data: schemaData } = useQuery(INTROSPECTION_QUERY);
   const { resolveLabel } = useI18n();
@@ -618,4 +618,4 @@ export default function EntityTable({ listField }: EntityTableProps) {
   );
 }
 
-
+export default EntityTable;
