@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { Autocomplete, Chip, TextField, Stack, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import type { GridFilterInputValueProps } from "@mui/x-data-grid";

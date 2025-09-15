@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { gql, useQuery } from "@apollo/client";
 import { 

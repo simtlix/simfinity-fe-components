@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { useQuery, useMutation, gql, useApolloClient } from "@apollo/client";
 import { getEntityFormCallbacks, EntityFormCallbackActions, FormMessage, CollectionFieldState as FormCustomizationCollectionFieldState, ParentFormAccess } from "./lib/formCustomization";
