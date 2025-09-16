@@ -80,6 +80,8 @@ type EntityFormProps = {
   listField: string; // e.g., "series"
   entityId?: string; // undefined for create, string for edit/view
   action: "create" | "edit" | "view"; // action from URL
+  // Optional navigation handling
+  onNavigate?: (path: string) => void;
 };
 
 type FormField = {
@@ -222,13 +224,15 @@ function processEmbeddedObjectFields(schema: SchemaData, objectTypeName: string,
   }
 }
 
-export default function EntityForm({ listField, entityId, action }: EntityFormProps) { 
-  // Navigation will be handled by the parent application
-  const navigate = (path: string) => {
-    if (typeof window !== 'undefined') {
+export default function EntityForm({ listField, entityId, action, onNavigate }: EntityFormProps) { 
+  // Navigation handling - use provided function or fallback to window.location
+  const navigate = React.useCallback((path: string) => {
+    if (onNavigate) {
+      onNavigate(path);
+    } else if (typeof window !== 'undefined') {
       window.location.href = path;
     }
-  };
+  }, [onNavigate]);
   const { resolveLabel } = useI18n();
   const client = useApolloClient();
   const [formData, setFormData] = React.useState<FormData>({} as FormData);

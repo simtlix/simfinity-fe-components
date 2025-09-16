@@ -13,6 +13,10 @@ import EditIcon from '@mui/icons-material/Edit';
 
 type EntityTableProps = {
   listField: string; // e.g., "series"
+  // Optional navigation and URL handling
+  onNavigate?: (path: string) => void;
+  getSearchParams?: () => URLSearchParams;
+  onSearchParamsChange?: (params: URLSearchParams) => void;
 };
 
 function buildPaginatedListQuery(listField: string, selection: string, sortBlock: string | null, filterBlock: string | null) {
@@ -29,18 +33,36 @@ function buildPaginatedListQuery(listField: string, selection: string, sortBlock
 
 type Row = Record<string, unknown>;
 
-function EntityTable({ listField }: EntityTableProps) {
+function EntityTable({ 
+  listField, 
+  onNavigate,
+  getSearchParams,
+  onSearchParamsChange 
+}: EntityTableProps) {
   const client = useApolloClient();
   const { data: schemaData } = useQuery(INTROSPECTION_QUERY);
   const { resolveLabel } = useI18n();
-  // URL parameters will be handled by the parent application
-  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  // Navigation will be handled by the parent application
-  const navigate = (path: string) => {
+  
+  // URL parameters handling - use provided function or fallback to window.location
+  const searchParams = React.useMemo(() => {
+    if (getSearchParams) {
+      return getSearchParams();
+    }
+    // Fallback for browser environments
     if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search);
+    }
+    return new URLSearchParams();
+  }, [getSearchParams]);
+  
+  // Navigation handling - use provided function or fallback to window.location
+  const navigate = React.useCallback((path: string) => {
+    if (onNavigate) {
+      onNavigate(path);
+    } else if (typeof window !== 'undefined') {
       window.location.href = path;
     }
-  };
+  }, [onNavigate]);
 
     // Helper function to get entity name from i18n
   const getEntityName = (pluralName: string, form: 'single' | 'plural'): string => {
@@ -227,12 +249,13 @@ function EntityTable({ listField }: EntityTableProps) {
       }
     }
     
-    const newURL = `${window.location.pathname}?${params.toString()}`;
-    // URL update will be handled by the parent application
-    if (typeof window !== 'undefined') {
+    if (onSearchParamsChange) {
+      onSearchParamsChange(params);
+    } else if (typeof window !== 'undefined') {
+      const newURL = `${window.location.pathname}?${params.toString()}`;
       window.history.replaceState({}, '', newURL);
     }
-  }, [searchParams]);
+  }, [searchParams, onSearchParamsChange]);
 
   // Initialize state from URL
   React.useEffect(() => {
