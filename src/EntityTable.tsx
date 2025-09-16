@@ -55,6 +55,21 @@ function EntityTable({
     return new URLSearchParams();
   }, [getSearchParams]);
   
+  // Create a stable reference to searchParams to prevent infinite re-renders
+  const searchParamsRef = React.useRef(searchParams);
+  const [currentSearchParams, setCurrentSearchParams] = React.useState(searchParams);
+  
+  // Update currentSearchParams only when searchParams actually changes
+  React.useEffect(() => {
+    const searchParamsString = searchParams.toString();
+    const currentString = searchParamsRef.current.toString();
+    
+    if (searchParamsString !== currentString) {
+      searchParamsRef.current = searchParams;
+      setCurrentSearchParams(searchParams);
+    }
+  }, [searchParams]);
+  
   // Navigation handling - use provided function or fallback to window.location
   const navigate = React.useCallback((path: string) => {
     if (onNavigate) {
@@ -213,7 +228,7 @@ function EntityTable({
     sort?: { field: string; sort: 'asc' | 'desc' }[] | null;
     filter?: GridFilterModel | null;
   }) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(currentSearchParams.toString());
     
     if (updates.page !== undefined) {
       if (updates.page === null || updates.page === 0) {
@@ -255,14 +270,14 @@ function EntityTable({
       const newURL = `${window.location.pathname}?${params.toString()}`;
       window.history.replaceState({}, '', newURL);
     }
-  }, [searchParams, onSearchParamsChange]);
+  }, [currentSearchParams, onSearchParamsChange]);
 
   // Initialize state from URL
   React.useEffect(() => {
-    const pageParam = searchParams.get('page');
-    const sizeParam = searchParams.get('size');
-    const sortParam = searchParams.get('sort');
-    const filterParam = searchParams.get('filter');
+    const pageParam = currentSearchParams.get('page');
+    const sizeParam = currentSearchParams.get('size');
+    const sortParam = currentSearchParams.get('sort');
+    const filterParam = currentSearchParams.get('filter');
     
     if (pageParam) {
       const pageNum = parseInt(pageParam, 10);
@@ -299,7 +314,7 @@ function EntityTable({
         console.warn('Invalid filter parameter:', filterParam);
       }
     }
-  }, [searchParams]);
+  }, [currentSearchParams]);
 
   React.useEffect(() => {
     if (!selection) return;
