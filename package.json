@@ -1,5 +1,5 @@
 {
-  "name": "simfinity-fe-components",
+  "name": "@simtlix/simfinity-fe-components",
   "version": "1.0.0",
   "type": "module",
   "description": "Simfinity Frontend Components - A dynamic, schema-driven form management system built with GraphQL, Apollo Client, and Material-UI",
@@ -71,10 +71,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/simtlix/simfinity-fe-package.git"
+    "url": "git+https://github.com/simtlix/simfinity-fe-components.git"
   },
   "bugs": {
-    "url": "https://github.com/simtlix/simfinity-fe-package/issues"
+    "url": "https://github.com/simtlix/simfinity-fe-components/issues"
   },
-  "homepage": "https://github.com/simtlix/simfinity-fe-package#readme"
+  "homepage": "https://github.com/simtlix/simfinity-fe-components#readme"
 }

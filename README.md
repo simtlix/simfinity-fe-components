@@ -1,4 +1,4 @@
-# simfinity-fe-components
+# @simtlix/simfinity-fe-components
 
 A dynamic, schema-driven form management system built with GraphQL, Apollo Client, and Material-UI v7.3.1. This package provides a comprehensive set of React components for building complex entity management interfaces that automatically generate forms from GraphQL schema introspection.
 
@@ -15,7 +15,7 @@ A dynamic, schema-driven form management system built with GraphQL, Apollo Clien
 ## Installation
 
 ```bash
-npm install simfinity-fe-components
+npm install @simtlix/simfinity-fe-components
 ```
 
 ## Peer Dependencies
@@ -29,7 +29,7 @@ npm install @apollo/client @emotion/react @emotion/styled @mui/material @mui/ico
 ## Quick Start
 
 ```tsx
-import { EntityForm, EntityTable } from 'simfinity-fe-components';
+import { EntityForm, EntityTable } from '@simtlix/simfinity-fe-components';
 
 function MyApp() {
   return (
@@ -119,7 +119,7 @@ const formCustomization: FormCustomization = {
 Built-in i18n support with customizable labels:
 
 ```tsx
-import { I18nProvider } from 'simfinity-fe-components';
+import { I18nProvider } from '@simtlix/simfinity-fe-components';
 
 const labels = {
   en: {
@@ -150,7 +150,7 @@ import type {
   EntityFormProps, 
   FormCustomization, 
   FormField 
-} from 'simfinity-fe-components';
+} from '@simtlix/simfinity-fe-components';
 
 const MyComponent: React.FC<EntityFormProps> = (props) => {
   // TypeScript will provide full intellisense
