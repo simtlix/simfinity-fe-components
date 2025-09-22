@@ -74,6 +74,20 @@ export default function CollectionFieldGrid({
   const { data: schemaData } = useQuery(INTROSPECTION_QUERY);
   const { resolveLabel } = useI18n();
   
+  // Helper function to get entity name from i18n
+  const getEntityName = (pluralName: string, form: 'single' | 'plural'): string => {
+    if (!schemaData) return `entity.${pluralName}.${form}`;
+    
+    // Get the proper entity type name from schema
+    const entityTypeName = getElementTypeNameOfListField(schemaData as SchemaData, pluralName);
+    if (!entityTypeName) return `entity.${pluralName}.${form}`;
+    
+    // Convert to lowercase for i18n key
+    const baseName = entityTypeName.toLowerCase();
+    
+    return `entity.${baseName}.${form}`;
+  };
+  
   // Helper function to get field information including extensions
   const getFieldInfo = React.useCallback((fieldName: string) => {
     if (!schemaData || !collectionField.objectTypeName) return null;
@@ -640,7 +654,7 @@ export default function CollectionFieldGrid({
                       onClick={handleAddItem}
                       size="small"
                     >
-                      Add {collectionField.objectTypeName}
+                      {resolveLabel(["button.create"], { entity: collectionField.objectTypeName }, "Add")} {resolveLabel([getEntityName(collectionField.objectTypeName, 'single')], { entity: collectionField.objectTypeName }, collectionField.objectTypeName)}
                     </Button>
                   </Box>
                 )}
