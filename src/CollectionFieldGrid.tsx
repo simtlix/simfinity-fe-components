@@ -567,13 +567,13 @@ export default function CollectionFieldGrid({
     if (isEditMode) {
       baseColumns.push({
         field: 'actions',
-        headerName: 'Actions',
+        headerName: resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions"),
         width: 120,
         sortable: false,
         filterable: false,
         renderCell: (params) => (
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Edit">
+            <Tooltip title={resolveLabel(["collection.actions.edit"], { entity: collectionField.objectTypeName }, "Edit")}>
               <IconButton
                 size="small"
                 onClick={() => handleEditItem(params.row)}
@@ -581,7 +581,7 @@ export default function CollectionFieldGrid({
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Delete">
+            <Tooltip title={resolveLabel(["collection.actions.delete"], { entity: collectionField.objectTypeName }, "Delete")}>
               <IconButton
                 size="small"
                 color="error"
@@ -619,7 +619,7 @@ export default function CollectionFieldGrid({
           <Typography variant="h6">{sectionLabel}</Typography>
         </AccordionSummary>
         <AccordionDetails>
-          <Typography color="error">Error: Could not generate collection query</Typography>
+          <Typography color="error">{resolveLabel(['collection.queryError'], { entity: collectionField.objectTypeName }, 'Error: Could not generate collection query')}</Typography>
         </AccordionDetails>
       </Accordion>
     );
@@ -654,7 +654,7 @@ export default function CollectionFieldGrid({
                       onClick={handleAddItem}
                       size="small"
                     >
-                      {resolveLabel(["button.create"], { entity: collectionField.objectTypeName }, "Add")} {resolveLabel([getEntityName(collectionField.objectTypeName, 'single')], { entity: collectionField.objectTypeName }, collectionField.objectTypeName)}
+                      {resolveLabel(["collection.button.create"], { entity: collectionField.objectTypeName }, "Add")} {resolveLabel([getEntityName(collectionField.objectTypeName, 'single')], { entity: collectionField.objectTypeName }, collectionField.objectTypeName)}
                     </Button>
                   </Box>
                 )}
@@ -714,7 +714,7 @@ export default function CollectionFieldGrid({
                               {resolveLabel([`${collectionField.objectTypeName}.${column}`], { entity: collectionField.name, field: column }, column)}
                             </TableCell>
                           ))}
-                          <TableCell>Actions</TableCell>
+                          <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -726,7 +726,7 @@ export default function CollectionFieldGrid({
                               </TableCell>
                             ))}
                             <TableCell>
-                              <Tooltip title="Revert Changes">
+                              <Tooltip title={resolveLabel(["collection.actions.revert"], { entity: collectionField.objectTypeName }, "Revert Changes")}>
                                 <IconButton
                                   size="small"
                                   onClick={() => handleRestoreItem(item)}
@@ -764,7 +764,7 @@ export default function CollectionFieldGrid({
                               {resolveLabel([`${collectionField.objectTypeName}.${column}`], { entity: collectionField.name, field: column }, column)}
                             </TableCell>
                           ))}
-                          <TableCell>Actions</TableCell>
+                          <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -776,7 +776,7 @@ export default function CollectionFieldGrid({
                               </TableCell>
                             ))}
                             <TableCell>
-                              <Tooltip title="Restore">
+                              <Tooltip title={resolveLabel(["collection.actions.restore"], { entity: collectionField.objectTypeName }, "Restore")}>
                                 <IconButton
                                   size="small"
                                   onClick={() => handleRestoreItem(item)}
@@ -814,7 +814,7 @@ export default function CollectionFieldGrid({
                               {resolveLabel([`${collectionField.objectTypeName}.${column}`], { entity: collectionField.name, field: column }, column)}
                             </TableCell>
                           ))}
-                          <TableCell>Actions</TableCell>
+                          <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -827,7 +827,7 @@ export default function CollectionFieldGrid({
                             ))}
                             <TableCell>
                               <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Tooltip title="Edit">
+                                <Tooltip title={resolveLabel(["collection.actions.edit"], { entity: collectionField.objectTypeName }, "Edit")}>
                                   <IconButton
                                     size="small"
                                     onClick={() => handleEditItem(item)}
@@ -836,7 +836,7 @@ export default function CollectionFieldGrid({
                                     <EditIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Remove">
+                                <Tooltip title={resolveLabel(["collection.actions.remove"], { entity: collectionField.objectTypeName }, "Remove")}>
                                   <IconButton
                                     size="small"
                                     onClick={() => handleDeleteItem(item)}
