@@ -411,7 +411,7 @@ function EntityTable({
     };
 
     const dataColumns = resolvedColumns.map((col) => {
-      const header = resolveLabel([`${entityNameForLabels}.${col}`], { entity: entityNameForLabels, field: col }, col);
+      const header = resolveLabel([`${entityNameForLabels.toLowerCase()}.${col}`], { entity: entityNameForLabels, field: col }, col);
       const typeName = (fieldTypeByColumn as Record<string, string | undefined>)[col];
       const isNumeric = isNumericScalarName(typeName);
       const isBoolean = isBooleanScalarName(typeName);

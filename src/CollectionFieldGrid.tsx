@@ -527,7 +527,7 @@ export default function CollectionFieldGrid({
     const baseColumns = displayColumns.map(column => {
       const columnDef: GridColDef = {
         field: column,
-        headerName: resolveLabel([`${collectionField.objectTypeName}.${column}`], { entity: collectionField.name, field: column }, column),
+        headerName: resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column),
         width: 150,
         sortable: true,
         filterable: false, // Disable filtering for now to keep it simple
@@ -610,7 +610,7 @@ export default function CollectionFieldGrid({
 
   console.log(`CollectionFieldGrid: parentEntityType=${parentEntityType}, collectionField.name=${collectionField.name}`);
   // Get section label using proper i18n format
-  const sectionLabel = resolveLabel([`${parentEntityType}.${collectionField.name}`], { entity: collectionField.objectTypeName }, collectionField.objectTypeName);
+  const sectionLabel = resolveLabel([`${parentEntityType.toLowerCase()}.${collectionField.name}`], { entity: collectionField.objectTypeName }, collectionField.objectTypeName);
 
   if (!collectionQuery) {
     return (
@@ -711,7 +711,7 @@ export default function CollectionFieldGrid({
                         <TableRow>
                           {displayColumns.map(column => (
                             <TableCell key={column}>
-                              {resolveLabel([`${collectionField.objectTypeName}.${column}`], { entity: collectionField.name, field: column }, column)}
+                              {resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}
                             </TableCell>
                           ))}
                           <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
@@ -761,7 +761,7 @@ export default function CollectionFieldGrid({
                         <TableRow>
                           {displayColumns.map(column => (
                             <TableCell key={column}>
-                              {resolveLabel([`${collectionField.objectTypeName}.${column}`], { entity: collectionField.name, field: column }, column)}
+                              {resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}
                             </TableCell>
                           ))}
                           <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
@@ -811,7 +811,7 @@ export default function CollectionFieldGrid({
                         <TableRow>
                           {displayColumns.map(column => (
                             <TableCell key={column}>
-                              {resolveLabel([`${collectionField.objectTypeName}.${column}`], { entity: collectionField.name, field: column }, column)}
+                              {resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}
                             </TableCell>
                           ))}
                           <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
