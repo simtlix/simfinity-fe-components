@@ -10,6 +10,7 @@ import { resolveColumnRenderer } from "./lib/columnRenderers";
 import { useI18n } from "./lib/i18n";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
 
 type EntityTableProps = {
   listField: string; // e.g., "series"
@@ -553,13 +554,15 @@ function EntityTable({
         <Typography variant="h5">
           {tableTitle}
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => navigate(`/entities/${listField}/create`)}
-        >
-          {resolveLabel(["button.create"], { entity: listField }, "Create")} {resolveLabel([getEntityName(listField, 'plural')], { entity: listField }, listField)}
-        </Button>
+        <Tooltip title={`${resolveLabel(["button.create"], { entity: listField }, "Create")} ${resolveLabel([getEntityName(listField, 'plural')], { entity: listField }, listField)}`}>
+          <IconButton
+            color="primary"
+            size="large"
+            onClick={() => navigate(`/entities/${listField}/create`)}
+          >
+            <AddCircleIcon fontSize="large" />
+          </IconButton>
+        </Tooltip>
       </Stack>
       {loadingData && (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>

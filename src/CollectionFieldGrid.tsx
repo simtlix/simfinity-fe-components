@@ -26,6 +26,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RestoreIcon from "@mui/icons-material/Restore";
 import AddIcon from "@mui/icons-material/Add";
+import AddCircleIcon from "@mui/icons-material/AddCircle";
 import { INTROSPECTION_QUERY, SchemaData, getElementTypeNameOfListField, getListEntityFieldNamesOfType, buildSelectionSetForObjectType, ValueResolver, getTypeByName, unwrapNamedType } from "./lib/introspection";
 import { resolveColumnRenderer } from "./lib/columnRenderers";
 import { useI18n } from "./lib/i18n";
@@ -648,14 +649,15 @@ export default function CollectionFieldGrid({
               <>
                 {(isEditMode || parentEntityId === "") && (
                   <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={handleAddItem}
-                      size="small"
-                    >
-                      {resolveLabel(["collection.button.create"], { entity: collectionField.objectTypeName }, "Add")} {resolveLabel([getEntityName(collectionField.objectTypeName, 'single')], { entity: collectionField.objectTypeName }, collectionField.objectTypeName)}
-                    </Button>
+                    <Tooltip title={`${resolveLabel(["collection.button.create"], { entity: collectionField.objectTypeName }, "Add")} ${resolveLabel([getEntityName(collectionField.objectTypeName, 'single')], { entity: collectionField.objectTypeName }, collectionField.objectTypeName)}`}>
+                      <IconButton
+                        color="primary"
+                        size="large"
+                        onClick={handleAddItem}
+                      >
+                        <AddCircleIcon fontSize="large" />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
                 )}
                 
