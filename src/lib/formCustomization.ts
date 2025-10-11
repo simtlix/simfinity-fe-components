@@ -112,6 +112,7 @@ export type FieldCustomization = {
   enabled?: boolean | ((fieldName: string, value: unknown, formData: Record<string, unknown>) => boolean);
   visible?: boolean | ((fieldName: string, value: unknown, formData: Record<string, unknown>) => boolean);
   order?: number;
+  stepId?: string; // Optional: step where this field should be displayed in stepper mode
   onChange?: (
     fieldName: string,
     value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown },
@@ -221,8 +222,16 @@ export type EntityCallbacksOnly = {
   onError?: EntityFormCallbacks['onError'];
 };
 
-export type FormCustomization = EntityCallbacksOnly & {
-  [key: string]: FieldCustomization | EmbeddedSectionCustomization | CollectionFieldCustomization;
+export type FormCustomizationBase = {
+  mode?: FormDisplayMode;
+  steps?: FormStep[];
+  beforeSubmit?: EntityFormCallbacks['beforeSubmit'];
+  onSuccess?: EntityFormCallbacks['onSuccess'];
+  onError?: EntityFormCallbacks['onError'];
+};
+
+export type FormCustomization = FormCustomizationBase & {
+  [key: string]: FieldCustomization | EmbeddedSectionCustomization | CollectionFieldCustomization | FormDisplayMode | FormStep[] | EntityFormCallbacks['beforeSubmit'] | EntityFormCallbacks['onSuccess'] | EntityFormCallbacks['onError'] | undefined;
 };
 
 export type FormCustomizationState = {
@@ -239,11 +248,22 @@ export type FormCustomizationActions = {
   setFieldOrder: (fieldOrder: string[]) => void;
 };
 
+// Step configuration for stepper mode
+export type FormStep = {
+  stepId: string;
+  stepLabel: string;
+  customStepRenderer?: () => React.ReactElement; // Custom renderer for the step (e.g., confirmation page)
+};
+
+export type FormDisplayMode = 'default' | 'stepper';
+
 // Global registry for form customizations
 // Key format: "entityType:mode" (e.g., "episode:create", "episode:edit")
 const formCustomizations = new Map<string, FormCustomization>();
 
 export type FormCustomizationConfig = EntityCallbacksOnly & {
+  mode?: FormDisplayMode; // Display mode: 'default' or 'stepper'
+  steps?: FormStep[]; // Steps configuration for stepper mode
   fieldsCustomization?: Record<string, FieldCustomization | EmbeddedSectionCustomization | CollectionFieldCustomization>;
 };
 
@@ -258,7 +278,9 @@ export function registerFormCustomization(
     ...(config.fieldsCustomization || {}),
     ...(config.beforeSubmit && { beforeSubmit: config.beforeSubmit }),
     ...(config.onSuccess && { onSuccess: config.onSuccess }),
-    ...(config.onError && { onError: config.onError })
+    ...(config.onError && { onError: config.onError }),
+    ...(config.mode && { mode: config.mode }),
+    ...(config.steps && { steps: config.steps })
   } as FormCustomization;
   
   console.log(`Registering form customization for ${entityType} in ${mode} mode:`, customization);
@@ -296,13 +318,18 @@ export function createFormCustomizationState(
   fieldNames.forEach(fieldName => {
     const fieldCustomization = customization[fieldName];
     
-    // Handle dynamic visible/enabled values
-    const visible = fieldCustomization?.visible;
-    const enabled = fieldCustomization?.enabled;
-    
-    // For static values, store them; for dynamic functions, store default true
-    fieldVisibility[fieldName] = typeof visible === 'function' ? true : (visible ?? true);
-    fieldEnabled[fieldName] = typeof enabled === 'function' ? true : (enabled ?? true);
+    if (isFieldCustomization(fieldCustomization) || isEmbeddedSectionCustomization(fieldCustomization)) {
+      // Handle dynamic visible/enabled values
+      const visible = fieldCustomization?.visible;
+      const enabled = fieldCustomization?.enabled;
+      
+      // For static values, store them; for dynamic functions, store default true
+      fieldVisibility[fieldName] = typeof visible === 'function' ? true : (visible ?? true);
+      fieldEnabled[fieldName] = typeof enabled === 'function' ? true : (enabled ?? true);
+    } else {
+      fieldVisibility[fieldName] = true;
+      fieldEnabled[fieldName] = true;
+    }
   });
   
   // Create field order based on customization or default order
@@ -310,14 +337,25 @@ export function createFormCustomizationState(
     const aCustomization = customization[a];
     const bCustomization = customization[b];
     
+    let aOrder: number | undefined;
+    let bOrder: number | undefined;
+    
+    if (isFieldCustomization(aCustomization) || isEmbeddedSectionCustomization(aCustomization)) {
+      aOrder = aCustomization?.order;
+    }
+    
+    if (isFieldCustomization(bCustomization) || isEmbeddedSectionCustomization(bCustomization)) {
+      bOrder = bCustomization?.order;
+    }
+    
     // If both have order, sort by order
-    if (aCustomization?.order !== undefined && bCustomization?.order !== undefined) {
-      return aCustomization.order - bCustomization.order;
+    if (aOrder !== undefined && bOrder !== undefined) {
+      return aOrder - bOrder;
     }
     
     // If only one has order, prioritize it
-    if (aCustomization?.order !== undefined) return -1;
-    if (bCustomization?.order !== undefined) return 1;
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
     
     // Default order
     return 0;
@@ -331,13 +369,30 @@ export function createFormCustomizationState(
   };
 }
 
+// Type guard for field customization
+function isFieldCustomization(value: unknown): value is FieldCustomization {
+  return typeof value === 'object' && value !== null && ('onChange' in value || 'customRenderer' in value || 'size' in value || 'enabled' in value || 'visible' in value || 'order' in value || 'stepId' in value);
+}
+
+// Type guard for embedded section customization
+function isEmbeddedSectionCustomization(value: unknown): value is EmbeddedSectionCustomization {
+  return typeof value === 'object' && value !== null && !('onChange' in value) && ('customEmbeddedRenderer' in value || ('size' in value || 'order' in value || 'visible' in value || 'enabled' in value));
+}
+
 export function getFieldSize(fieldName: string, customization: FormCustomization): FieldSize {
   const fieldCustomization = customization[fieldName];
-  return fieldCustomization?.size || { xs: 12, sm: 6, md: 4 };
+  if (isFieldCustomization(fieldCustomization) || isEmbeddedSectionCustomization(fieldCustomization)) {
+    return fieldCustomization?.size || { xs: 12, sm: 6, md: 4 };
+  }
+  return { xs: 12, sm: 6, md: 4 };
 }
 
 export function isFieldVisible(fieldName: string, state: FormCustomizationState, currentValue?: unknown, formData?: Record<string, unknown>): boolean {
   const fieldCustomization = state.customization[fieldName];
+  if (!isFieldCustomization(fieldCustomization) && !isEmbeddedSectionCustomization(fieldCustomization)) {
+    return state.fieldVisibility[fieldName] ?? true;
+  }
+  
   const visible = fieldCustomization?.visible;
   
   if (typeof visible === 'function') {
@@ -349,6 +404,10 @@ export function isFieldVisible(fieldName: string, state: FormCustomizationState,
 
 export function isFieldEnabled(fieldName: string, state: FormCustomizationState, currentValue?: unknown, formData?: Record<string, unknown>): boolean {
   const fieldCustomization = state.customization[fieldName];
+  if (!isFieldCustomization(fieldCustomization) && !isEmbeddedSectionCustomization(fieldCustomization)) {
+    return state.fieldEnabled[fieldName] ?? true;
+  }
+  
   const enabled = fieldCustomization?.enabled;
   
   if (typeof enabled === 'function') {
@@ -371,8 +430,8 @@ export function getEmbeddedFieldCustomization(
   const embeddedFieldKey = `${sectionName}.${fieldName}`;
   const fieldCustomization = customization[embeddedFieldKey];
   
-  if (fieldCustomization && 'onChange' in fieldCustomization) {
-    return fieldCustomization as FieldCustomization;
+  if (isFieldCustomization(fieldCustomization)) {
+    return fieldCustomization;
   }
   
   return undefined;
@@ -385,8 +444,8 @@ export function getEmbeddedSectionCustomization(
 ): EmbeddedSectionCustomization | undefined {
   const sectionCustomization = customization[sectionName];
   
-  if (sectionCustomization && !('onChange' in sectionCustomization)) {
-    return sectionCustomization as EmbeddedSectionCustomization;
+  if (isEmbeddedSectionCustomization(sectionCustomization)) {
+    return sectionCustomization;
   }
   
   return undefined;
@@ -402,11 +461,16 @@ export function getEmbeddedFieldSize(
   const embeddedFieldKey = `${sectionName}.${fieldName}`;
   const fieldCustomization = customization[embeddedFieldKey];
   
-  if (fieldCustomization && 'size' in fieldCustomization && fieldCustomization.size) {
+  if (isFieldCustomization(fieldCustomization) && fieldCustomization.size) {
     return fieldCustomization.size;
   }
   
   return defaultSize;
+}
+
+// Type guard for collection field customization
+function isCollectionFieldCustomization(value: unknown): value is CollectionFieldCustomization {
+  return typeof value === 'object' && value !== null && ('items' in value || 'customCollectionRenderer' in value || 'onDelete' in value || 'onEdit' in value || 'onCreate' in value);
 }
 
 // Helper function to get collection field customization
@@ -416,8 +480,8 @@ export function getCollectionFieldCustomization(
 ): CollectionFieldCustomization | undefined {
   const collectionCustomization = customization[collectionFieldName];
   
-  if (collectionCustomization) {
-    return collectionCustomization as CollectionFieldCustomization;
+  if (isCollectionFieldCustomization(collectionCustomization)) {
+    return collectionCustomization;
   }
   
   return undefined;
@@ -495,7 +559,7 @@ export function isCollectionField(
   fieldName: string
 ): boolean {
   const fieldCustomization = customization[fieldName];
-  return fieldCustomization && 'items' in fieldCustomization;
+  return isCollectionFieldCustomization(fieldCustomization);
 }
 
 // Helper function to get collection item onSubmit callback

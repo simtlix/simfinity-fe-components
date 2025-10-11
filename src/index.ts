@@ -7,6 +7,9 @@ export * from './hooks';
 // Library utilities (Client Components)
 export * from './lib';
 
+// Stepper Component
+export { default as CustomStepper, variants as StepperVariants } from './Stepper';
+
 // Types
 export type {
   FieldSize,
@@ -28,4 +31,6 @@ export type {
   FormCustomizationState,
   FormCustomizationActions,
   FormCustomizationConfig,
+  FormStep,
+  FormDisplayMode,
 } from './lib/formCustomization';

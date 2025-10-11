@@ -106,8 +106,8 @@ export default function FormFieldRenderer({
   
   // Get field customization
   const fieldCustomization = customizationState?.customization[fieldPath];
-  const isVisible = fieldCustomization?.visible !== false;
-  const isEnabled = fieldCustomization?.enabled !== false;
+  const isVisible = (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'visible' in fieldCustomization) ? (fieldCustomization as any).visible !== false : true;
+  const isEnabled = (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'enabled' in fieldCustomization) ? (fieldCustomization as any).enabled !== false : true;
   
   if (!isVisible) {
     return null;

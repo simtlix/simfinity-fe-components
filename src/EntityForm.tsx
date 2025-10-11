@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useQuery, useMutation, gql, useApolloClient } from "@apollo/client";
-import { getEntityFormCallbacks, EntityFormCallbackActions, FormMessage, CollectionFieldState as FormCustomizationCollectionFieldState, ParentFormAccess } from "./lib/formCustomization";
+import { getEntityFormCallbacks, EntityFormCallbackActions, FormMessage, CollectionFieldState as FormCustomizationCollectionFieldState, ParentFormAccess, FormStep } from "./lib/formCustomization";
 import { getEntityStateMachine, getAvailableStateMachineActions, hasStateMachineSupport } from "./lib/stateMachineRegistry";
 import { resolveStateMachineActionLabel } from "./lib/i18n";
 import {
@@ -25,6 +25,7 @@ import {
   FormHelperText,
   Menu,
 } from "@mui/material";
+import CustomStepper, { variants } from "./Stepper";
 
 // GraphQL queries and mutations
 const GET_ENTITY_QUERY = gql`
@@ -240,6 +241,9 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [formMessage, setFormMessage] = React.useState<FormMessage | null>(null);
+  
+  // Stepper mode state
+  const [currentStepIndex, setCurrentStepIndex] = React.useState(0);
   
   // State machine functionality
   const [stateMachineMenuAnchor, setStateMachineMenuAnchor] = React.useState<null | HTMLElement>(null);
@@ -1555,8 +1559,8 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     
     // Get field customization for custom onChange and custom renderer
     const fieldCustomization = customizationState.customization[field.name];
-    const customOnChange = fieldCustomization && 'onChange' in fieldCustomization ? fieldCustomization.onChange : undefined;
-    const customRenderer = fieldCustomization && 'customRenderer' in fieldCustomization ? fieldCustomization.customRenderer : undefined;
+    const customOnChange = (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'onChange' in fieldCustomization) ? (fieldCustomization as any).onChange : undefined;
+    const customRenderer = (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'customRenderer' in fieldCustomization) ? (fieldCustomization as any).customRenderer : undefined;
     
     // Use custom renderer if provided
     if (customRenderer) {
@@ -1818,7 +1822,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
             })()
           )}
           
-          {action !== "view" && (
+          {action !== "view" && customizationState.customization.mode !== 'stepper' && (
             <Button
               type="submit"
               variant="contained"
@@ -1854,79 +1858,263 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
       )}
 
                 {/* Form */}
-          <Paper sx={{ p: 3 }}>
-            <form id="entity-form" onSubmit={handleSubmit}>
-              <Grid container spacing={3} >
-                {(() => {
-                  const mainFormFields = formFields.filter(field => !field.isCollection);
-                  const collectionFields = formFields.filter(field => field.isCollection);
-                  
-                  console.log('Form rendering:', {
-                    mainFormFields: mainFormFields.map(f => f.name),
-                    collectionFields: collectionFields.map(f => ({ name: f.name, collectionObjectTypeName: f.collectionObjectTypeName, connectionField: f.connectionField }))
-                  });
-                  
-                  // Get ordered fields based on customization
-                  const orderedFields = getFieldOrder(customizationState);
-                  const visibleFields = mainFormFields.filter(field => isFieldVisible(field.name, customizationState, field.value, formData));
-                  
-                  // Sort fields according to customization order
-                  const sortedFields = visibleFields.sort((a, b) => {
-                    const aIndex = orderedFields.indexOf(a.name);
-                    const bIndex = orderedFields.indexOf(b.name);
-                    if (aIndex === -1 && bIndex === -1) return 0;
-                    if (aIndex === -1) return 1;
-                    if (bIndex === -1) return -1;
-                    return aIndex - bIndex;
-                  });
-                  
-                  return sortedFields.map(field => {
-                    // Get field customization properties
-                    const fieldSize = getFieldSize(field.name, customizationState.customization);
-                    const isEnabled = isFieldEnabled(field.name, customizationState, field.value, formData);
-                    
-                    // Handle embedded object fields as sections - these will be rendered separately at the bottom
-                    if (field.isEmbedded) {
-                      return null; // Don't render embedded sections here
-                    }
-                    
-                    // Handle regular fields with customization
-                    return (
-                      <Grid key={field.name} size={fieldSize}>
-                        {renderField(formData[field.name] || field, isEnabled)}
-                      </Grid>
-                    );
-                  });
-                })()}
-              </Grid>
-
-          {/* Embedded Object Sections - Rendered at the bottom */}
           {(() => {
-            const embeddedFields = formFields.filter(field => field.isEmbedded);
-            if (embeddedFields.length === 0) return null;
+            const isStepperMode = customizationState.customization.mode === 'stepper';
+            const steps = customizationState.customization.steps || [];
             
-            // Sort embedded fields by their customization order
-            const sortedEmbeddedFields = embeddedFields.sort((a, b) => {
-              const aCustomization = getEmbeddedSectionCustomization(customizationState.customization, a.name);
-              const bCustomization = getEmbeddedSectionCustomization(customizationState.customization, b.name);
-              
-              const aOrder = aCustomization?.order ?? 999;
-              const bOrder = bCustomization?.order ?? 999;
-              
-              return aOrder - bOrder;
-            });
+            // Handler for stepper navigation
+            const handleStepClick = (stepIndex: number) => {
+              setCurrentStepIndex(stepIndex);
+            };
             
+            const handleNextStep = () => {
+              if (currentStepIndex < steps.length - 1) {
+                setCurrentStepIndex(currentStepIndex + 1);
+              }
+            };
+            
+            const handlePreviousStep = () => {
+              if (currentStepIndex > 0) {
+                setCurrentStepIndex(currentStepIndex - 1);
+              }
+            };
+            
+            // Render stepper mode
+            if (isStepperMode && steps.length > 0) {
+              const currentStep = steps[currentStepIndex];
+              const currentStepId = currentStep?.stepId;
+              
+              // Convert steps to the format expected by CustomStepper
+              const stepperSteps = steps.map((step, index) => ({
+                id: index + 1,
+                label: step.stepLabel,
+              }));
+              
+              return (
+                <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                  {/* Stepper component on the left (or top on mobile) */}
+                  <CustomStepper
+                    activeStep={currentStepIndex}
+                    steps={stepperSteps}
+                    handleStepClick={handleStepClick}
+                    variant={action === "create" ? variants.classic : variants.linear}
+                    allowClickBack={true}
+                  />
+                  
+                  {/* Form content on the right */}
+                  <Paper sx={{ p: 3, flex: 1 }}>
+                    <form id="entity-form" onSubmit={handleSubmit}>
+                      {/* Render custom step renderer if available */}
+                      {currentStep?.customStepRenderer ? (
+                        currentStep.customStepRenderer()
+                      ) : (
+                        <>
+                          <Grid container spacing={3}>
+                            {(() => {
+                              const mainFormFields = formFields.filter(field => !field.isCollection);
+                              
+                              // Get ordered fields based on customization
+                              const orderedFields = getFieldOrder(customizationState);
+                              const visibleFields = mainFormFields.filter(field => 
+                                isFieldVisible(field.name, customizationState, field.value, formData)
+                              );
+                              
+                              // Filter fields for current step
+                              const stepFields = visibleFields.filter(field => {
+                                const fieldCustomization = customizationState.customization[field.name];
+                                if (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'stepId' in fieldCustomization) {
+                                  return (fieldCustomization as { stepId?: string }).stepId === currentStepId;
+                                }
+                                return false;
+                              });
+                              
+                              // Sort fields according to customization order
+                              const sortedFields = stepFields.sort((a, b) => {
+                                const aIndex = orderedFields.indexOf(a.name);
+                                const bIndex = orderedFields.indexOf(b.name);
+                                if (aIndex === -1 && bIndex === -1) return 0;
+                                if (aIndex === -1) return 1;
+                                if (bIndex === -1) return -1;
+                                return aIndex - bIndex;
+                              });
+                              
+                              return sortedFields.map(field => {
+                                // Get field customization properties
+                                const fieldSize = getFieldSize(field.name, customizationState.customization);
+                                const isEnabled = isFieldEnabled(field.name, customizationState, field.value, formData);
+                                
+                                // Handle embedded object fields as sections
+                                if (field.isEmbedded) {
+                                  return null;
+                                }
+                                
+                                // Handle regular fields with customization
+                                return (
+                                  <Grid key={field.name} size={fieldSize}>
+                                    {renderField(formData[field.name] || field, isEnabled)}
+                                  </Grid>
+                                );
+                              });
+                            })()}
+                          </Grid>
+
+                          {/* Embedded Object Sections for current step */}
+                          {(() => {
+                            const embeddedFields = formFields.filter(field => {
+                              if (!field.isEmbedded) return false;
+                              const fieldCustomization = customizationState.customization[field.name];
+                              if (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'stepId' in fieldCustomization) {
+                                return (fieldCustomization as { stepId?: string }).stepId === currentStepId;
+                              }
+                              return false;
+                            });
+                            
+                            if (embeddedFields.length === 0) return null;
+                            
+                            const sortedEmbeddedFields = embeddedFields.sort((a, b) => {
+                              const aCustomization = getEmbeddedSectionCustomization(customizationState.customization, a.name);
+                              const bCustomization = getEmbeddedSectionCustomization(customizationState.customization, b.name);
+                              
+                              const aOrder = aCustomization?.order ?? 999;
+                              const bOrder = bCustomization?.order ?? 999;
+                              
+                              return aOrder - bOrder;
+                            });
+                            
+                            return (
+                              <>
+                                <Divider sx={{ my: 3 }} />
+                                {sortedEmbeddedFields.map(field => renderEmbeddedSection(field, true))}
+                              </>
+                            );
+                          })()}
+                        </>
+                      )}
+                      
+                      {/* Navigation buttons */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+                        <Button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handlePreviousStep();
+                          }}
+                          disabled={currentStepIndex === 0}
+                          variant="outlined"
+                        >
+                          {resolveLabel(["form.back"], { entity: listField }, "Back")}
+                        </Button>
+                        
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          {currentStepIndex === steps.length - 1 && action !== "view" ? (
+                            <Button
+                              type="submit"
+                              variant="contained"
+                              disabled={loading || createLoading || updateLoading}
+                            >
+                              {loading || createLoading || updateLoading ? <CircularProgress size={20} /> : action === "create" 
+                                ? resolveLabel(["form.create"], { entity: listField }, "Create")
+                                : resolveLabel(["form.update"], { entity: listField }, "Update")
+                              }
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleNextStep();
+                              }}
+                              disabled={currentStepIndex === steps.length - 1}
+                              variant="contained"
+                            >
+                              {resolveLabel(["form.next"], { entity: listField }, "Next")}
+                            </Button>
+                          )}
+                        </Box>
+                      </Box>
+                    </form>
+                  </Paper>
+                </Box>
+              );
+            }
+            
+            // Render default mode
             return (
-              <>
-                <Divider sx={{ my: 3 }} />
-                {sortedEmbeddedFields.map(field => renderEmbeddedSection(field, true))}
-              </>
+              <Paper sx={{ p: 3 }}>
+                <form id="entity-form" onSubmit={handleSubmit}>
+                  <Grid container spacing={3} >
+                    {(() => {
+                      const mainFormFields = formFields.filter(field => !field.isCollection);
+                      const collectionFields = formFields.filter(field => field.isCollection);
+                      
+                      console.log('Form rendering:', {
+                        mainFormFields: mainFormFields.map(f => f.name),
+                        collectionFields: collectionFields.map(f => ({ name: f.name, collectionObjectTypeName: f.collectionObjectTypeName, connectionField: f.connectionField }))
+                      });
+                      
+                      // Get ordered fields based on customization
+                      const orderedFields = getFieldOrder(customizationState);
+                      const visibleFields = mainFormFields.filter(field => isFieldVisible(field.name, customizationState, field.value, formData));
+                      
+                      // Sort fields according to customization order
+                      const sortedFields = visibleFields.sort((a, b) => {
+                        const aIndex = orderedFields.indexOf(a.name);
+                        const bIndex = orderedFields.indexOf(b.name);
+                        if (aIndex === -1 && bIndex === -1) return 0;
+                        if (aIndex === -1) return 1;
+                        if (bIndex === -1) return -1;
+                        return aIndex - bIndex;
+                      });
+                      
+                      return sortedFields.map(field => {
+                        // Get field customization properties
+                        const fieldSize = getFieldSize(field.name, customizationState.customization);
+                        const isEnabled = isFieldEnabled(field.name, customizationState, field.value, formData);
+                        
+                        // Handle embedded object fields as sections - these will be rendered separately at the bottom
+                        if (field.isEmbedded) {
+                          return null; // Don't render embedded sections here
+                        }
+                        
+                        // Handle regular fields with customization
+                        return (
+                          <Grid key={field.name} size={fieldSize}>
+                            {renderField(formData[field.name] || field, isEnabled)}
+                          </Grid>
+                        );
+                      });
+                    })()}
+                  </Grid>
+
+              {/* Embedded Object Sections - Rendered at the bottom */}
+              {(() => {
+                const embeddedFields = formFields.filter(field => field.isEmbedded);
+                if (embeddedFields.length === 0) return null;
+                
+                // Sort embedded fields by their customization order
+                const sortedEmbeddedFields = embeddedFields.sort((a, b) => {
+                  const aCustomization = getEmbeddedSectionCustomization(customizationState.customization, a.name);
+                  const bCustomization = getEmbeddedSectionCustomization(customizationState.customization, b.name);
+                  
+                  const aOrder = aCustomization?.order ?? 999;
+                  const bOrder = bCustomization?.order ?? 999;
+                  
+                  return aOrder - bOrder;
+                });
+                
+                return (
+                  <>
+                    <Divider sx={{ my: 3 }} />
+                    {sortedEmbeddedFields.map(field => renderEmbeddedSection(field, true))}
+                  </>
+                );
+              })()}
+
+
+            </form>
+          </Paper>
             );
           })()}
-
-
-        </form>
-      </Paper>
 
       {/* Collection Fields */}
       {(() => {

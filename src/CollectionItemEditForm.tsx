@@ -305,11 +305,16 @@ export default function CollectionItemEditForm({
       // Initialize field visibility and enabled state
       fieldNames.forEach(fieldName => {
         const fieldCustomization = flattenedCustomization[fieldName];
-        const visible = fieldCustomization?.visible;
-        const enabled = fieldCustomization?.enabled;
-        
-        newCustomizationState.fieldVisibility[fieldName] = typeof visible === 'function' ? true : (visible ?? true);
-        newCustomizationState.fieldEnabled[fieldName] = typeof enabled === 'function' ? true : (enabled ?? true);
+        if (typeof fieldCustomization === 'object' && fieldCustomization !== null) {
+          const visible = (fieldCustomization as any).visible;
+          const enabled = (fieldCustomization as any).enabled;
+          
+          newCustomizationState.fieldVisibility[fieldName] = typeof visible === 'function' ? true : (visible ?? true);
+          newCustomizationState.fieldEnabled[fieldName] = typeof enabled === 'function' ? true : (enabled ?? true);
+        } else {
+          newCustomizationState.fieldVisibility[fieldName] = true;
+          newCustomizationState.fieldEnabled[fieldName] = true;
+        }
       });
       
       // Create field order
@@ -317,12 +322,22 @@ export default function CollectionItemEditForm({
         const aCustomization = flattenedCustomization[a];
         const bCustomization = flattenedCustomization[b];
         
-        if (aCustomization?.order !== undefined && bCustomization?.order !== undefined) {
-          return aCustomization.order - bCustomization.order;
+        let aOrder: number | undefined;
+        let bOrder: number | undefined;
+        
+        if (typeof aCustomization === 'object' && aCustomization !== null && 'order' in aCustomization) {
+          aOrder = (aCustomization as any).order;
+        }
+        if (typeof bCustomization === 'object' && bCustomization !== null && 'order' in bCustomization) {
+          bOrder = (bCustomization as any).order;
         }
         
-        if (aCustomization?.order !== undefined) return -1;
-        if (bCustomization?.order !== undefined) return 1;
+        if (aOrder !== undefined && bOrder !== undefined) {
+          return aOrder - bOrder;
+        }
+        
+        if (aOrder !== undefined) return -1;
+        if (bOrder !== undefined) return 1;
         
         return 0;
       });
@@ -382,7 +397,7 @@ export default function CollectionItemEditForm({
 
     // Get field customization
     const fieldCustomization = customizationState.customization[fieldName];
-    const customOnChange = fieldCustomization && 'onChange' in fieldCustomization ? fieldCustomization.onChange : undefined;
+    const customOnChange = (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'onChange' in fieldCustomization) ? (fieldCustomization as any).onChange : undefined;
 
     if (customOnChange) {
       // Create default parent form access if not provided
