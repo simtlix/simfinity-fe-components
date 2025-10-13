@@ -494,13 +494,31 @@ export default function CollectionItemEditForm({
         console.log(`Processing field ${field.name}:`, { field, formField });
         
         if (formField) {
+          let fieldValue = formField.value;
+          
+          // Convert numeric fields from string to number
+          if (field.isNumeric && fieldValue && typeof fieldValue === 'string') {
+            fieldValue = Number(fieldValue);
+            console.log(`Numeric field ${field.name} converted to number:`, fieldValue);
+          }
+          
+          // Convert date fields from YYYY-MM-DD to ISO 8601 DateTime format
+          if (field.isDate && fieldValue && typeof fieldValue === 'string') {
+            // Check if it's just a date (YYYY-MM-DD) and not already a full DateTime
+            if (/^\d{4}-\d{2}-\d{2}$/.test(fieldValue)) {
+              // Convert to ISO 8601 DateTime (midnight UTC)
+              fieldValue = `${fieldValue}T00:00:00.000Z`;
+              console.log(`Date field ${field.name} converted to DateTime:`, fieldValue);
+            }
+          }
+          
           // For object fields, extract the ID for submission
-          if (field.isObject && typeof formField.value === 'object' && formField.value !== null && 'id' in formField.value) {
-            updatedItem[field.name] = (formField.value as { id: string; [key: string]: unknown });
-            console.log(`Object field ${field.name}: stored object with ID:`, formField.value);
+          if (field.isObject && typeof fieldValue === 'object' && fieldValue !== null && 'id' in fieldValue) {
+            updatedItem[field.name] = (fieldValue as { id: string; [key: string]: unknown });
+            console.log(`Object field ${field.name}: stored object with ID:`, fieldValue);
           } else {
-            updatedItem[field.name] = formField.value;
-            console.log(`Scalar field ${field.name}: stored value:`, formField.value, 'type:', typeof formField.value);
+            updatedItem[field.name] = fieldValue;
+            console.log(`Scalar field ${field.name}: stored value:`, fieldValue, 'type:', typeof fieldValue);
           }
         } else {
           console.warn(`No form field data found for ${field.name}`);
