@@ -649,7 +649,8 @@ export default function CollectionItemEditForm({
               console.log(`Custom renderer field ${fieldName} onChange:`, { value, type: typeof value });
               handleFieldChange(fieldName, value);
             },
-            !isEnabled || isStateMachineField
+            !isEnabled || isStateMachineField,
+            formData
           )}
         </Grid>
       );

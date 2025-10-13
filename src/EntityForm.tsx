@@ -1645,12 +1645,13 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     
     // Use custom renderer if provided
     if (customRenderer) {
-      return (customRenderer as (field: FormField, actions: FormCustomizationActions, handler: (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => void, disabled: boolean) => React.ReactElement)(
+      return (customRenderer as (field: FormField, actions: FormCustomizationActions, handler: (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => void, disabled: boolean, formData: Record<string, unknown>) => React.ReactElement)(
         field,
         customizationActions,
         (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => 
           handleFieldChange(fieldName, value),
-        isViewMode || !enabled || isStateMachineField
+        isViewMode || !enabled || isStateMachineField,
+        formData
       );
     }
     
@@ -1987,7 +1988,13 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                     <form id="entity-form" onSubmit={handleSubmit}>
                       {/* Render custom step renderer if available */}
                       {currentStep?.customStepRenderer ? (
-                        currentStep.customStepRenderer()
+                        currentStep.customStepRenderer(
+                          customizationActions,
+                          handleFieldChange,
+                          handleEmbeddedFieldChange,
+                          action === "view",
+                          formData
+                        )
                       ) : (
                         <>
                           <Grid container spacing={3}>

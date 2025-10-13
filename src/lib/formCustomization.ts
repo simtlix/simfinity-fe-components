@@ -126,7 +126,8 @@ export type FieldCustomization = {
     field: FormField,
     customizationActions: FormCustomizationActions,
     handleFieldChange: (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => void,
-    disabled: boolean
+    disabled: boolean,
+    formData: Record<string, unknown>
   ) => React.ReactElement;
 };
 
@@ -252,7 +253,13 @@ export type FormCustomizationActions = {
 export type FormStep = {
   stepId: string;
   stepLabel: string;
-  customStepRenderer?: () => React.ReactElement; // Custom renderer for the step (e.g., confirmation page)
+  customStepRenderer?: (
+    customizationActions: FormCustomizationActions,
+    handleFieldChange: (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => void,
+    handleEmbeddedFieldChange: (sectionName: string, fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }, error?: string) => void,
+    disabled: boolean,
+    formData: Record<string, unknown>
+  ) => React.ReactElement; // Custom renderer for the step (e.g., confirmation page)
 };
 
 export type FormDisplayMode = 'default' | 'stepper';
