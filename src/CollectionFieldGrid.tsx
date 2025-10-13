@@ -633,9 +633,9 @@ export default function CollectionFieldGrid({
           <Typography variant="h6">{sectionLabel}</Typography>
         </AccordionSummary>
         <AccordionDetails>
-        <Box sx={{ width: '100%' }}>
+        <Box sx={{ width: '100%', overflowX: 'auto' }}>
           {/* Main collection grid */}
-          <Box sx={{ height: 400, width: '100%', mb: 3 }}>
+          <Box sx={{ width: '100%', mb: 3 }}>
             {collectionLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                 <CircularProgress />
@@ -666,27 +666,28 @@ export default function CollectionFieldGrid({
                     <Typography color="text.secondary">{resolveLabel(['collection.noData'], { entity: collectionField.objectTypeName }, 'No data available')}</Typography>
                   </Box>
                 ) : (
-                  <DataGrid
-                    rows={rows}
-                    columns={gridColumns}
-                    pagination
-                    paginationModel={{ page, pageSize: rowsPerPage }}
-                    onPaginationModelChange={handlePaginationModelChange}
-                    pageSizeOptions={[5, 10, 25]}
-                    rowCount={totalCount}
-                    paginationMode="server"
-                    sortingMode="server"
-                    sortModel={sortModel}
-                    onSortModelChange={(model) => {
-                      const norm = (Array.isArray(model) ? model : [])
-                        .filter((m) => m.field && m.sort)
-                        .map((m) => ({ field: String(m.field), sort: m.sort as 'asc' | 'desc' }));
-                      setSortModel(norm);
-                    }}
-                    loading={collectionLoading}
-                    disableRowSelectionOnClick
-                    autoHeight
-                  />
+                  <Paper variant="outlined">
+                    <DataGrid
+                      rows={rows}
+                      columns={gridColumns}
+                      pagination
+                      paginationModel={{ page, pageSize: rowsPerPage }}
+                      onPaginationModelChange={handlePaginationModelChange}
+                      pageSizeOptions={[5, 10, 25]}
+                      rowCount={totalCount}
+                      paginationMode="server"
+                      sortingMode="server"
+                      sortModel={sortModel}
+                      onSortModelChange={(model) => {
+                        const norm = (Array.isArray(model) ? model : [])
+                          .filter((m) => m.field && m.sort)
+                          .map((m) => ({ field: String(m.field), sort: m.sort as 'asc' | 'desc' }));
+                        setSortModel(norm);
+                      }}
+                      loading={collectionLoading}
+                      disableRowSelectionOnClick
+                    />
+                  </Paper>
                 )}
               </>
             )}

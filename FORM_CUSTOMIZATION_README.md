@@ -6,6 +6,7 @@ This guide provides comprehensive documentation for customizing forms in `@simtl
 
 - [Overview](#overview)
 - [Core Concepts](#core-concepts)
+- [Stepper Mode](#stepper-mode)
 - [Field Customization](#field-customization)
 - [Collection Field Customization](#collection-field-customization)
 - [Embedded Section Customization](#embedded-section-customization)
@@ -19,6 +20,7 @@ This guide provides comprehensive documentation for customizing forms in `@simtl
 
 The form customization system provides a declarative way to customize forms without modifying the core components. You can:
 
+- Organize forms into multiple steps with **Stepper Mode**
 - Control field visibility and enabled state
 - Customize field size and layout
 - Add custom validation logic
@@ -68,6 +70,241 @@ registerFormCustomization('Series', 'create', {
   beforeSubmit: async (formData, collectionChanges, transformedData, actions) => {
     // Validation logic
     return true;
+  }
+});
+```
+
+## Stepper Mode
+
+Stepper mode allows you to organize forms into multiple steps for better user experience with complex forms. Each field can be assigned to a specific step.
+
+### Enabling Stepper Mode
+
+```tsx
+registerFormCustomization('Series', 'create', {
+  mode: 'stepper', // Enable stepper mode
+  steps: [
+    {
+      stepId: 'basic',
+      stepLabel: 'Basic Information'
+    },
+    {
+      stepId: 'details',
+      stepLabel: 'Details'
+    },
+    {
+      stepId: 'episodes',
+      stepLabel: 'Episodes'
+    }
+  ],
+  fieldsCustomization: {
+    // Fields must have stepId in stepper mode
+    name: {
+      stepId: 'basic',
+      size: { xs: 12, md: 6 }
+    },
+    category: {
+      stepId: 'basic',
+      size: { xs: 12, md: 6 }
+    },
+    description: {
+      stepId: 'details',
+      size: { xs: 12 }
+    },
+    episodes: {
+      stepId: 'episodes',
+      size: { xs: 12 }
+    }
+  }
+});
+```
+
+### Important Rules
+
+**In stepper mode:**
+- ✅ All fields (regular, embedded, collection) **MUST** have a `stepId` to be displayed
+- ✅ Fields are only shown when their assigned step is active
+- ❌ Fields without `stepId` will **NOT** be rendered
+- ✅ Navigation buttons (Next/Back) are automatically provided
+- ✅ Submit button only appears on the last step
+
+### Step Configuration
+
+```tsx
+type FormStep = {
+  stepId: string;           // Unique identifier for the step
+  stepLabel: string;        // Display name for the step
+  customStepRenderer?: () => React.ReactElement; // Optional custom renderer
+};
+```
+
+### Assigning Fields to Steps
+
+**Regular Fields:**
+```tsx
+fieldsCustomization: {
+  name: {
+    stepId: 'basic',  // Assign to 'basic' step
+    size: { xs: 12, md: 6 }
+  }
+}
+```
+
+**Collection Fields:**
+```tsx
+fieldsCustomization: {
+  episodes: {
+    stepId: 'episodes',  // Collection field in 'episodes' step
+    size: { xs: 12 }
+  }
+}
+```
+
+**Embedded Fields:**
+```tsx
+fieldsCustomization: {
+  metadata: {
+    stepId: 'details',  // Embedded section in 'details' step
+    size: { xs: 12 },
+    fieldsCustomization: {
+      author: { size: { xs: 12, md: 6 } },
+      tags: { size: { xs: 12, md: 6 } }
+    }
+  }
+}
+```
+
+### Custom Step Renderer
+
+You can provide a custom renderer for any step:
+
+```tsx
+registerFormCustomization('Series', 'create', {
+  mode: 'stepper',
+  steps: [
+    {
+      stepId: 'basic',
+      stepLabel: 'Basic Information'
+    },
+    {
+      stepId: 'custom',
+      stepLabel: 'Custom Step',
+      customStepRenderer: () => {
+        return (
+          <Box>
+            <Typography variant="h6">Custom Step Content</Typography>
+            <YourCustomComponent />
+          </Box>
+        );
+      }
+    }
+  ]
+});
+```
+
+### Variant Modes
+
+The stepper component supports two visual variants:
+
+- **Classic** (default for create mode): Shows completed steps with checkmarks
+- **Linear** (default for edit mode): All steps are clickable, active step is highlighted
+
+### Theme Customization
+
+You can customize the stepper appearance through MUI theme. See [STEPPER_THEME_EXAMPLE.md](./STEPPER_THEME_EXAMPLE.md) for complete theme configuration.
+
+### Complete Example
+
+```tsx
+registerFormCustomization('Series', 'create', {
+  mode: 'stepper',
+  steps: [
+    {
+      stepId: 'basic',
+      stepLabel: 'Basic Information'
+    },
+    {
+      stepId: 'content',
+      stepLabel: 'Content'
+    },
+    {
+      stepId: 'episodes',
+      stepLabel: 'Episodes'
+    },
+    {
+      stepId: 'review',
+      stepLabel: 'Review',
+      customStepRenderer: () => (
+        <Box>
+          <Typography variant="h6">Review your series</Typography>
+          <SeriesReviewComponent />
+        </Box>
+      )
+    }
+  ],
+  fieldsCustomization: {
+    // Step 1: Basic Information
+    name: {
+      stepId: 'basic',
+      size: { xs: 12, md: 6 },
+      onChange: (fieldName, value, formData, setFieldData) => {
+        const slug = value.toString().toLowerCase().replace(/\s+/g, '-');
+        setFieldData('slug', slug);
+        return { value };
+      }
+    },
+    slug: {
+      stepId: 'basic',
+      size: { xs: 12, md: 6 }
+    },
+    category: {
+      stepId: 'basic',
+      size: { xs: 12, md: 6 }
+    },
+    
+    // Step 2: Content
+    description: {
+      stepId: 'content',
+      size: { xs: 12 }
+    },
+    coverImage: {
+      stepId: 'content',
+      size: { xs: 12, md: 6 }
+    },
+    metadata: {
+      stepId: 'content',
+      size: { xs: 12 },
+      fieldsCustomization: {
+        author: { size: { xs: 12, md: 6 } },
+        tags: { size: { xs: 12, md: 6 } }
+      }
+    },
+    
+    // Step 3: Episodes
+    episodes: {
+      stepId: 'episodes',
+      size: { xs: 12 },
+      fieldsCustomization: {
+        title: { size: { xs: 12, md: 6 } },
+        duration: { size: { xs: 12, md: 6 } }
+      }
+    }
+  },
+  
+  beforeSubmit: async (formData, collectionChanges, transformedData, actions) => {
+    // Final validation before submission
+    if (!formData.name || !formData.description) {
+      actions.setError('Name and description are required');
+      return false;
+    }
+    return true;
+  },
+  
+  onSuccess: (result, actions) => {
+    return {
+      message: 'Series created successfully!',
+      navigateTo: `/series/${result.id}/view`
+    };
   }
 });
 ```

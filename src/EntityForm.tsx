@@ -1988,6 +1988,64 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                               </>
                             );
                           })()}
+
+                          {/* Collection Fields for current step */}
+                          {(() => {
+                            const collectionFields = formFields.filter(field => {
+                              if (!field.isCollection || !field.collectionObjectTypeName || !field.connectionField) return false;
+                              const fieldCustomization = customizationState.customization[field.name];
+                              if (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'stepId' in fieldCustomization) {
+                                return (fieldCustomization as { stepId?: string }).stepId === currentStepId;
+                              }
+                              return false;
+                            });
+                            
+                            if (collectionFields.length === 0) return null;
+                            
+                            return (
+                              <>
+                                {collectionFields.map(field => {
+                                  // Check for custom collection renderer
+                                  const collectionCustomization = getCollectionFieldCustomization(customizationState.customization, field.name);
+                                  const customCollectionRenderer = collectionCustomization?.customCollectionRenderer;
+                                  
+                                  if (customCollectionRenderer) {
+                                    return (
+                                      <Box key={field.name} sx={{ mt: 3 }}>
+                                        {customCollectionRenderer(
+                                          field.name,
+                                          parentFormAccess,
+                                          getCollectionState(field.name) as unknown as Record<string, unknown>,
+                                          (newState: Record<string, unknown>) => updateCollectionState(field.name, newState as unknown as CollectionFieldState),
+                                          entityId || null,
+                                          action === "edit"
+                                        )}
+                                      </Box>
+                                    );
+                                  }
+                                  
+                                  // Default collection rendering
+                                  return (
+                                    <Box key={field.name} sx={{ mt: 3 }}>
+                                      <CollectionFieldGrid
+                                        collectionField={{
+                                          name: field.name,
+                                          objectTypeName: field.collectionObjectTypeName!,
+                                          connectionField: field.connectionField!,
+                                        }}
+                                        parentEntityId={entityId || ""}
+                                        parentEntityType={entityTypeName || ""}
+                                        isEditMode={action === "edit"}
+                                        collectionState={getCollectionState(field.name)}
+                                        onCollectionStateChange={updateCollectionState}
+                                        parentFormAccess={parentFormAccess}
+                                      />
+                                    </Box>
+                                  );
+                                })}
+                              </>
+                            );
+                          })()}
                         </>
                       )}
                       
@@ -2116,8 +2174,14 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
             );
           })()}
 
-      {/* Collection Fields */}
+      {/* Collection Fields (only for non-stepper mode) */}
       {(() => {
+        const isStepperMode = customizationState.customization.mode === 'stepper';
+        
+        // In stepper mode, all fields must have a stepId to be displayed
+        // Only render collection fields here if NOT in stepper mode
+        if (isStepperMode) return null;
+        
         const validCollectionFields = formFields.filter(field => 
           field.isCollection && field.collectionObjectTypeName && field.connectionField
         );

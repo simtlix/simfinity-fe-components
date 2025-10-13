@@ -7,6 +7,7 @@ A comprehensive React component library for building dynamic, schema-driven enti
 - **🔧 Dynamic Form Generation**: Automatically generates forms from GraphQL schema introspection
 - **📊 Advanced Data Tables**: Server-side pagination, sorting, filtering with Material-UI DataGrid
 - **🏗️ Entity Management**: Create, edit, view, and manage any entity type
+- **📝 Stepper Mode**: Multi-step forms with customizable steps and navigation
 - **🔗 Complex Relationships**: Handles nested objects, collections, and foreign key relationships
 - **🎨 Extensive Customization**: Field-level customization with visibility, validation, and layout control
 - **🌍 Internationalization**: Built-in i18n support with multi-language capabilities
