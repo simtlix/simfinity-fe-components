@@ -1968,7 +1968,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
               // Convert steps to the format expected by CustomStepper
               const stepperSteps = steps.map((step, index) => ({
                 id: index + 1,
-                label: step.stepLabel,
+                label: resolveLabel([step.stepLabel], { entity: listField }, step.stepLabel),
               }));
               
               return (
