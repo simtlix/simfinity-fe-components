@@ -1961,6 +1961,59 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
               }
             };
             
+            // Validate if current step's required fields are completed
+            const isCurrentStepValid = () => {
+              if (!isStepperMode || steps.length === 0) return true;
+              
+              const currentStep = steps[currentStepIndex];
+              const currentStepId = currentStep?.stepId;
+              
+              // Get all fields for the current step (regular, embedded, and collection)
+              const stepFields = formFields.filter(field => {
+                const fieldCustomization = customizationState.customization[field.name];
+                if (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'stepId' in fieldCustomization) {
+                  return (fieldCustomization as { stepId?: string }).stepId === currentStepId;
+                }
+                return false;
+              });
+              
+              // Check if all required fields in the current step have values
+              for (const field of stepFields) {
+                // Skip validation if field is not visible or not enabled
+                const isVisible = isFieldVisible(field.name, customizationState, field.value, formData);
+                const isEnabled = isFieldEnabled(field.name, customizationState, field.value, formData);
+                
+                if (!isVisible || !isEnabled) continue;
+                
+                // Check if field is required and has a value
+                if (field.required) {
+                  const fieldData = formData[field.name];
+                  const fieldValue = fieldData?.value;
+                  
+                  // Handle embedded fields
+                  if (field.isEmbedded && field.embeddedFields) {
+                    for (const embeddedField of field.embeddedFields) {
+                      if (embeddedField.required) {
+                        const embeddedFieldData = formData[embeddedField.name];
+                        const embeddedFieldValue = embeddedFieldData?.value;
+                        
+                        if (embeddedFieldValue === undefined || embeddedFieldValue === null || embeddedFieldValue === '') {
+                          return false;
+                        }
+                      }
+                    }
+                  } else {
+                    // Regular field validation
+                    if (fieldValue === undefined || fieldValue === null || fieldValue === '') {
+                      return false;
+                    }
+                  }
+                }
+              }
+              
+              return true;
+            };
+            
             // Render stepper mode
             if (isStepperMode && steps.length > 0) {
               const currentStep = steps[currentStepIndex];
@@ -2170,7 +2223,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                                 e.preventDefault();
                                 handleNextStep();
                               }}
-                              disabled={currentStepIndex === steps.length - 1}
+                              disabled={currentStepIndex === steps.length - 1 || !isCurrentStepValid()}
                               variant="contained"
                             >
                               {resolveLabel(["form.next"], { entity: listField }, "Next")}
