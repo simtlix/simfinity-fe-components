@@ -1020,8 +1020,8 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     return cleanedItem;
   }, []);
 
-  // Helper function to convert date fields in collection items
-  const convertCollectionItemDates = React.useCallback((item: CollectionItem, collectionTypeName: string): CollectionItem => {
+  // Helper function to convert field types in collection items (numeric and date fields)
+  const convertCollectionItemTypes = React.useCallback((item: CollectionItem, collectionTypeName: string): CollectionItem => {
     if (!schemaData) return item;
     
     const collectionType = getTypeByName(schemaData as SchemaData, collectionTypeName);
@@ -1034,8 +1034,16 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
       const field = collectionType.fields?.find(f => f.name === key);
       if (field) {
         const fieldTypeName = unwrapNamedType(field.type);
+        const isNumeric = isNumericScalarName(fieldTypeName);
         const isDate = isDateTimeScalarName(fieldTypeName);
         
+        // Convert numeric fields from string to number
+        if (isNumeric && convertedItem[key] && typeof convertedItem[key] === 'string') {
+          convertedItem[key] = Number(convertedItem[key]);
+          console.log(`Collection item numeric field ${key} converted to number:`, convertedItem[key]);
+        }
+        
+        // Convert date fields to DateTime format
         if (isDate && convertedItem[key] && typeof convertedItem[key] === 'string') {
           const dateValue = convertedItem[key] as string;
           // Check if it's just a date (YYYY-MM-DD) and not already a full DateTime
@@ -1076,9 +1084,9 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
               console.log(`🗑️ Removed temporary ID from added item:`, cleanItem.id);
               delete (cleanItem as Record<string, unknown>).id;
             }
-            // Convert date fields to DateTime format
+            // Convert field types (numeric and date fields)
             if (field.objectTypeName) {
-              cleanItem = convertCollectionItemDates(cleanItem, field.objectTypeName);
+              cleanItem = convertCollectionItemTypes(cleanItem, field.objectTypeName);
             }
             // Clean object fields within the item
             cleanItem = cleanCollectionItemObjectFields(cleanItem, field, schemaData as SchemaData);
@@ -1104,9 +1112,9 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
             if (field.connectionField && cleanItem[field.connectionField] !== undefined) {
               delete cleanItem[field.connectionField];
             }
-            // Convert date fields to DateTime format
+            // Convert field types (numeric and date fields)
             if (field.objectTypeName) {
-              cleanItem = convertCollectionItemDates(cleanItem, field.objectTypeName);
+              cleanItem = convertCollectionItemTypes(cleanItem, field.objectTypeName);
             }
             // Clean object fields within the item
             cleanItem = cleanCollectionItemObjectFields(cleanItem, field, schemaData as SchemaData);
@@ -1147,7 +1155,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     });
     
     return transformedCollections;
-  }, [formFields, convertCollectionItemDates, cleanCollectionItemObjectFields, deepCleanCollectionItem, schemaData]);
+  }, [formFields, convertCollectionItemTypes, cleanCollectionItemObjectFields, deepCleanCollectionItem, schemaData]);
 
   // Cache invalidation functions
   const invalidateEntityListCache = React.useCallback(async (entityType: string) => {
@@ -1204,6 +1212,12 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
               const embeddedFieldName = embeddedField.name.replace(`${field.name}.`, '');
               let embeddedFieldValue = formData[embeddedField.name]?.value;
               
+              // Convert numeric fields from string to number
+              if (embeddedField.isNumeric && embeddedFieldValue && typeof embeddedFieldValue === 'string') {
+                embeddedFieldValue = Number(embeddedFieldValue);
+                console.log(`Embedded numeric field ${embeddedField.name} converted to number:`, embeddedFieldValue);
+              }
+              
               // Convert date fields from YYYY-MM-DD to ISO 8601 DateTime format
               if (embeddedField.isDate && embeddedFieldValue && typeof embeddedFieldValue === 'string') {
                 // Check if it's just a date (YYYY-MM-DD) and not already a full DateTime
@@ -1239,6 +1253,12 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
         } else {
           // Handle scalar fields (string, number, boolean, list of scalars)
           let currentValue = formData[field.name]?.value;
+          
+          // Convert numeric fields from string to number
+          if (field.isNumeric && currentValue && typeof currentValue === 'string') {
+            currentValue = Number(currentValue);
+            console.log(`Numeric field ${field.name} converted to number:`, currentValue);
+          }
           
           // Convert date fields from YYYY-MM-DD to ISO 8601 DateTime format
           if (field.isDate && currentValue && typeof currentValue === 'string') {
