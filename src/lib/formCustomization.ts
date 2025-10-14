@@ -260,6 +260,22 @@ export type FormStep = {
     disabled: boolean,
     formData: Record<string, unknown>
   ) => React.ReactElement; // Custom renderer for the step (e.g., confirmation page)
+  // Called when Next button is clicked (before navigation)
+  // Return false to prevent navigation to next step, true or undefined to continue
+  onNext?: (
+    formData: Record<string, unknown>,
+    collectionChanges: Record<string, CollectionFieldState>,
+    transformedData: Record<string, unknown>,
+    actions: EntityFormCallbackActions
+  ) => boolean | void | Promise<boolean | void>;
+  // Called when Back button is clicked (before navigation)
+  // Return false to prevent navigation to previous step, true or undefined to continue
+  onBack?: (
+    formData: Record<string, unknown>,
+    collectionChanges: Record<string, CollectionFieldState>,
+    transformedData: Record<string, unknown>,
+    actions: EntityFormCallbackActions
+  ) => boolean | void | Promise<boolean | void>;
 };
 
 export type FormDisplayMode = 'default' | 'stepper';

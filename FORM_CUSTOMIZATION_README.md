@@ -135,8 +135,29 @@ type FormStep = {
   stepId: string;           // Unique identifier for the step
   stepLabel: string;        // Display name for the step
   customStepRenderer?: () => React.ReactElement; // Optional custom renderer
+  onNext?: (                // Called when Next button is clicked
+    formData: Record<string, unknown>,
+    collectionChanges: Record<string, CollectionFieldState>,
+    transformedData: Record<string, unknown>,
+    actions: EntityFormCallbackActions
+  ) => boolean | void | Promise<boolean | void>;
+  onBack?: (                // Called when Back button is clicked
+    formData: Record<string, unknown>,
+    collectionChanges: Record<string, CollectionFieldState>,
+    transformedData: Record<string, unknown>,
+    actions: EntityFormCallbackActions
+  ) => boolean | void | Promise<boolean | void>;
 };
 ```
+
+**Step Navigation Callbacks:**
+- `onNext`: Called before navigating to the next step. Return `false` to prevent navigation.
+- `onBack`: Called before navigating to the previous step. Return `false` to prevent navigation.
+- Both callbacks have the same signature as `beforeSubmit` and receive:
+  - `formData`: Current form data
+  - `collectionChanges`: Changes in collection fields
+  - `transformedData`: Transformed data ready for submission
+  - `actions`: Actions to modify form state (setFieldData, setFieldVisible, setFieldEnabled, setFormMessage, setError)
 
 ### Assigning Fields to Steps
 
@@ -201,6 +222,61 @@ registerFormCustomization('Series', 'create', {
   ]
 });
 ```
+
+### Step Navigation Callbacks
+
+You can add validation or custom logic before navigating between steps:
+
+```tsx
+registerFormCustomization('Series', 'create', {
+  mode: 'stepper',
+  steps: [
+    {
+      stepId: 'basic',
+      stepLabel: 'Basic Information',
+      onNext: async (formData, collectionChanges, transformedData, actions) => {
+        // Validate or process data before moving to next step
+        if (!formData.name || formData.name === '') {
+          actions.setFormMessage({
+            type: 'error',
+            message: 'Please enter a series name before continuing'
+          });
+          return false; // Block navigation
+        }
+        
+        // Optional: Make API call to validate data
+        try {
+          await validateSeriesName(formData.name);
+          return true; // Allow navigation (can also return undefined)
+        } catch (error) {
+          actions.setError('Series name already exists');
+          return false; // Block navigation
+        }
+      }
+    },
+    {
+      stepId: 'episodes',
+      stepLabel: 'Episodes',
+      onBack: async (formData, collectionChanges, transformedData, actions) => {
+        // Warn user before going back if they have unsaved changes
+        if (collectionChanges.episodes?.added?.length > 0) {
+          const confirmed = window.confirm('You have unsaved episodes. Go back anyway?');
+          return confirmed; // Block or allow based on user choice
+        }
+        return true; // Allow navigation
+      }
+    }
+  ]
+});
+```
+
+**Common Use Cases:**
+- ✅ Validate step-specific data before proceeding
+- ✅ Make API calls to check data validity
+- ✅ Show warnings for unsaved changes
+- ✅ Set form messages or errors
+- ✅ Modify field visibility or enabled state before navigation
+- ✅ Log analytics events on step changes
 
 ### Variant Modes
 

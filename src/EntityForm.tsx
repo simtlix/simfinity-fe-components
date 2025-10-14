@@ -1949,14 +1949,72 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
               setCurrentStepIndex(stepIndex);
             };
             
-            const handleNextStep = () => {
+            const handleNextStep = async () => {
               if (currentStepIndex < steps.length - 1) {
+                const currentStep = steps[currentStepIndex];
+                
+                // Execute onNext callback if available
+                if (currentStep?.onNext) {
+                  try {
+                    // Get collection changes and transformed data (same as beforeSubmit)
+                    const collectionChanges = getCollectionChanges();
+                    const transformedData = transformFormDataForMutation(formData, collectionChanges);
+                    
+                    // Call onNext callback
+                    const shouldContinue = await currentStep.onNext(
+                      formData, 
+                      collectionChanges as Record<string, FormCustomizationCollectionFieldState>, 
+                      transformedData, 
+                      createCallbackActions()
+                    );
+                    
+                    // If callback explicitly returns false, stop navigation
+                    if (shouldContinue === false) {
+                      console.log('Navigation to next step cancelled by onNext callback');
+                      return;
+                    }
+                  } catch (onNextError) {
+                    console.error('Error in onNext callback:', onNextError);
+                    // If onNext throws an error, stop navigation
+                    return;
+                  }
+                }
+                
                 setCurrentStepIndex(currentStepIndex + 1);
               }
             };
             
-            const handlePreviousStep = () => {
+            const handlePreviousStep = async () => {
               if (currentStepIndex > 0) {
+                const currentStep = steps[currentStepIndex];
+                
+                // Execute onBack callback if available
+                if (currentStep?.onBack) {
+                  try {
+                    // Get collection changes and transformed data (same as beforeSubmit)
+                    const collectionChanges = getCollectionChanges();
+                    const transformedData = transformFormDataForMutation(formData, collectionChanges);
+                    
+                    // Call onBack callback
+                    const shouldContinue = await currentStep.onBack(
+                      formData, 
+                      collectionChanges as Record<string, FormCustomizationCollectionFieldState>, 
+                      transformedData, 
+                      createCallbackActions()
+                    );
+                    
+                    // If callback explicitly returns false, stop navigation
+                    if (shouldContinue === false) {
+                      console.log('Navigation to previous step cancelled by onBack callback');
+                      return;
+                    }
+                  } catch (onBackError) {
+                    console.error('Error in onBack callback:', onBackError);
+                    // If onBack throws an error, stop navigation
+                    return;
+                  }
+                }
+                
                 setCurrentStepIndex(currentStepIndex - 1);
               }
             };
