@@ -278,28 +278,13 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
   // Unified form actions (used everywhere: callbacks, customizations, etc.)
   const formActions = React.useMemo((): EntityFormCallbackActions => ({
     setFieldData: (fieldName: string, value: unknown) => {
-      // Check if this is an embedded field (contains a dot)
-      if (typeof fieldName === 'string' && fieldName.includes('.')) {
-        const [parentField, embeddedField] = fieldName.split('.');
-        const fullFieldName = `${parentField}.${embeddedField}`;
-        
-        setFormData(prev => ({
-          ...prev,
-          [fullFieldName]: { 
-            ...prev[fullFieldName], 
-            value: (value === null ? "" : value) as string | number | boolean | string[] | null | { id: string; [key: string]: unknown }
-          }
-        }));
-      } else {
-        // Regular field
-        setFormData(prev => ({
-          ...prev,
-          [fieldName]: { 
-            ...prev[fieldName], 
-            value: value as string | number | boolean | string[] | null | { id: string; [key: string]: unknown } 
-          }
-        }));
-      }
+      setFormData(prev => ({
+        ...prev,
+        [fieldName]: { 
+          ...prev[fieldName], 
+          value: (value === null ? "" : value) as string | number | boolean | string[] | null | { id: string; [key: string]: unknown }
+        }
+      }));
     },
     setFieldVisible: (fieldName: string, visible: boolean) => {
       setCustomizationState(prev => ({
