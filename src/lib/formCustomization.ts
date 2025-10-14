@@ -250,6 +250,17 @@ export type FormCustomizationActions = {
   setFieldOrder: (fieldOrder: string[]) => void;
 };
 
+// Step action for custom buttons in stepper mode
+export type StepAction = {
+  name: string; // Unique identifier for the action
+  renderer: (
+    actions: EntityFormCallbackActions,
+    formData: Record<string, unknown>,
+    collectionChanges: Record<string, CollectionFieldState>,
+    action: "create" | "edit" | "view"
+  ) => React.ReactElement; // Custom renderer for the action button
+};
+
 // Step configuration for stepper mode
 export type FormStep = {
   stepId: string;
@@ -261,6 +272,7 @@ export type FormStep = {
     disabled: boolean,
     formData: Record<string, unknown>
   ) => React.ReactElement; // Custom renderer for the step (e.g., confirmation page)
+  actions?: StepAction[]; // Custom action buttons rendered next to Next button
   // Called when Next button is clicked (before navigation)
   // Return false to prevent navigation to next step, true or undefined to continue
   onNext?: (

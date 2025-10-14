@@ -131,10 +131,21 @@ registerFormCustomization('Series', 'create', {
 ### Step Configuration
 
 ```tsx
+type StepAction = {
+  name: string;             // Unique identifier for the action
+  renderer: (               // Custom button renderer
+    actions: EntityFormCallbackActions,
+    formData: Record<string, unknown>,
+    collectionChanges: Record<string, CollectionFieldState>,
+    action: "create" | "edit" | "view"
+  ) => React.ReactElement;
+};
+
 type FormStep = {
   stepId: string;           // Unique identifier for the step
   stepLabel: string;        // Display name for the step
   customStepRenderer?: () => React.ReactElement; // Optional custom renderer
+  actions?: StepAction[];   // Custom action buttons (rendered next to Next button)
   onNext?: (                // Called when Next button is clicked
     formData: Record<string, unknown>,
     collectionChanges: Record<string, CollectionFieldState>,
@@ -150,10 +161,11 @@ type FormStep = {
 };
 ```
 
-**Step Navigation Callbacks:**
+**Step Properties:**
+- `actions`: Array of custom action buttons rendered next to the Next button (on the left)
 - `onNext`: Called before navigating to the next step. Return `false` to prevent navigation.
 - `onBack`: Called before navigating to the previous step. Return `false` to prevent navigation.
-- Both callbacks have the same signature as `beforeSubmit` and receive:
+- Navigation callbacks have the same signature as `beforeSubmit` and receive:
   - `formData`: Current form data
   - `collectionChanges`: Changes in collection fields
   - `transformedData`: Transformed data ready for submission
@@ -277,6 +289,104 @@ registerFormCustomization('Series', 'create', {
 - ✅ Set form messages or errors
 - ✅ Modify field visibility or enabled state before navigation
 - ✅ Log analytics events on step changes
+
+### Custom Step Actions
+
+You can add custom action buttons to each step. These buttons are rendered next to the Next button (on the left side):
+
+```tsx
+registerFormCustomization('Series', 'create', {
+  mode: 'stepper',
+  steps: [
+    {
+      stepId: 'basic',
+      stepLabel: 'Basic Information',
+      actions: [
+        {
+          name: 'preview',
+          renderer: (actions, formData, collectionChanges, action) => {
+            return (
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  // Show preview dialog
+                  window.open(`/preview?data=${JSON.stringify(formData)}`, '_blank');
+                }}
+                disabled={action === "view"}
+              >
+                Preview
+              </Button>
+            );
+          }
+        },
+        {
+          name: 'saveDraft',
+          renderer: (actions, formData, collectionChanges, action) => {
+            return (
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={async () => {
+                  // Save draft logic including collections
+                  await saveDraft(formData, collectionChanges);
+                  actions.setFieldData('draftSaved', true);
+                }}
+                disabled={action === "view"}
+              >
+                Save Draft
+              </Button>
+            );
+          }
+        }
+      ]
+    },
+    {
+      stepId: 'episodes',
+      stepLabel: 'Episodes',
+      actions: [
+        {
+          name: 'importEpisodes',
+          renderer: (actions, formData, collectionChanges, action) => {
+            return (
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  // Open import dialog
+                  setImportDialogOpen(true);
+                }}
+                disabled={action === "view"}
+                startIcon={<UploadIcon />}
+              >
+                Import Episodes
+              </Button>
+            );
+          }
+        }
+      ]
+    }
+  ]
+});
+```
+
+**Action Renderer Parameters:**
+- `actions`: EntityFormCallbackActions to modify form state
+  - `setFieldData`: Update field values
+  - `setFieldVisible`: Control field visibility
+  - `setFieldEnabled`: Control field enabled state
+  - `setCollectionChanges`: Modify collection data
+  - `setFormMessage`: Show form-level messages
+  - `setError`: Display errors
+- `formData`: Current form data for conditional logic
+- `collectionChanges`: Current collection changes (added, modified, deleted items)
+- `action`: Form mode ("create" | "edit" | "view") - use for conditional logic
+
+**Common Use Cases:**
+- 📄 Preview current data
+- 💾 Save draft/temporary state
+- 📤 Import/Export data
+- 🔄 Auto-fill from template
+- 📋 Copy from previous entry
+- ✨ Run calculations or validations
 
 ### Variant Modes
 

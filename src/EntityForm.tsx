@@ -2270,6 +2270,19 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                         </Button>
                         
                         <Box sx={{ display: 'flex', gap: 1 }}>
+                          {/* Custom step actions */}
+                          {currentStep?.actions?.map((stepAction) => (
+                            <React.Fragment key={stepAction.name}>
+                              {stepAction.renderer(
+                                createCallbackActions(),
+                                formData,
+                                getCollectionChanges(),
+                                action
+                              )}
+                            </React.Fragment>
+                          ))}
+                          
+                          {/* Next or Submit button */}
                           {currentStepIndex === steps.length - 1 && action !== "view" ? (
                             <Button
                               type="submit"
