@@ -613,6 +613,24 @@ export default function CollectionFieldGrid({
   // Get section label using proper i18n format
   const sectionLabel = resolveLabel([`${parentEntityType.toLowerCase()}.${collectionField.name}`], { entity: collectionField.objectTypeName }, collectionField.objectTypeName);
 
+  // DataGrid locale text for internationalization
+  const localeText = React.useMemo(() => {
+    const t = (k: string, d: string) => resolveLabel([`grid.${k}`], { entity: collectionField.objectTypeName }, d);
+    return {
+      // Pagination
+      MuiTablePagination: {
+        labelRowsPerPage: t('pagination.rowsPerPage', 'Rows per page:'),
+        labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) =>
+          t('pagination.displayedRows', `${from}–${to} of ${count !== -1 ? count : `more than ${to}`}`),
+      },
+      // Footer
+      footerRowSelected: (count: number) =>
+        count !== 1
+          ? t('footer.rowsSelected', `${count.toLocaleString()} rows selected`)
+          : t('footer.rowSelected', `${count.toLocaleString()} row selected`),
+    } as const;
+  }, [resolveLabel, collectionField.objectTypeName]);
+
   if (!collectionQuery) {
     return (
       <Accordion defaultExpanded>
@@ -685,6 +703,7 @@ export default function CollectionFieldGrid({
                         setSortModel(norm);
                       }}
                       loading={collectionLoading}
+                      localeText={localeText}
                       disableRowSelectionOnClick
                     />
                   </Paper>
