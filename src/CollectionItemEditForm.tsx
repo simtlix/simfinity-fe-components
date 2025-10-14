@@ -360,12 +360,12 @@ export default function CollectionItemEditForm({
     }
   }, [formFields]);
 
-  // Form customization actions
+  // Form customization actions (unified type with all methods)
   const customizationActions: FormCustomizationActions = React.useMemo(() => ({
-    setFieldData: (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => {
+    setFieldData: (fieldName: string, value: unknown) => {
       setFormData(prev => ({
         ...prev,
-        [fieldName]: { ...prev[fieldName], value }
+        [fieldName]: { ...prev[fieldName], value: value as string | number | boolean | string[] | null | { id: string; [key: string]: unknown } }
       }));
     },
     setFieldVisible: (fieldName: string, visible: boolean) => {
@@ -385,6 +385,18 @@ export default function CollectionItemEditForm({
         ...prev,
         fieldOrder
       }));
+    },
+    setCollectionChanges: () => {
+      // Not applicable in collection item edit form (no nested collections)
+      console.warn('setCollectionChanges not supported in collection item forms');
+    },
+    setFormMessage: () => {
+      // Not applicable in collection item edit form (handled by parent)
+      console.warn('setFormMessage not supported in collection item forms');
+    },
+    setError: () => {
+      // Not applicable in collection item edit form (handled by parent)
+      console.warn('setError not supported in collection item forms');
     },
   }), []);
 

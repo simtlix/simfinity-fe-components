@@ -64,15 +64,20 @@ export type EntityFormCallbacks = {
   ) => void | Promise<void>;
 };
 
-// Actions available in entity-level callbacks
-export type EntityFormCallbackActions = {
+// Unified actions available in all customization contexts
+export type FormActions = {
   setFieldData: (fieldName: string, value: unknown) => void;
   setFieldVisible: (fieldName: string, visible: boolean) => void;
   setFieldEnabled: (fieldName: string, enabled: boolean) => void;
+  setFieldOrder: (fieldOrder: string[]) => void;
   setCollectionChanges: (fieldName: string, changes: CollectionFieldState) => void;
   setFormMessage: (message: FormMessage) => void;
   setError: (errorMessage: string) => void;
 };
+
+// Legacy aliases for backwards compatibility
+export type EntityFormCallbackActions = FormActions;
+export type FormCustomizationActions = FormActions;
 
 // Result from afterSuccess callback
 export type EntityFormSuccessResult = {
@@ -241,13 +246,6 @@ export type FormCustomizationState = {
   fieldVisibility: Record<string, boolean>;
   fieldEnabled: Record<string, boolean>;
   fieldOrder: string[];
-};
-
-export type FormCustomizationActions = {
-  setFieldData: (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => void;
-  setFieldVisible: (fieldName: string, visible: boolean) => void;
-  setFieldEnabled: (fieldName: string, enabled: boolean) => void;
-  setFieldOrder: (fieldOrder: string[]) => void;
 };
 
 // Step action for custom buttons in stepper mode

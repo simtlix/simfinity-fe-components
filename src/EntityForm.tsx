@@ -275,61 +275,11 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     resetAllCollectionStates
   } = useCollectionState();
 
-  // Create reusable callback actions
-  const createCallbackActions = React.useCallback((): EntityFormCallbackActions => ({
+  // Unified form actions (used everywhere: callbacks, customizations, etc.)
+  const formActions = React.useMemo((): EntityFormCallbackActions => ({
     setFieldData: (fieldName: string, value: unknown) => {
-      setFormData(prev => ({
-        ...prev,
-        [fieldName]: { ...prev[fieldName], value: value as string | number | boolean | string[] | null | { id: string; [key: string]: unknown } }
-      }));
-    },
-    setFieldVisible: (fieldName: string, visible: boolean) => {
-      setCustomizationState(prev => ({
-        ...prev,
-        fieldVisibility: { ...prev.fieldVisibility, [fieldName]: visible }
-      }));
-    },
-    setFieldEnabled: (fieldName: string, enabled: boolean) => {
-      setCustomizationState(prev => ({
-        ...prev,
-        fieldEnabled: { ...prev.fieldEnabled, [fieldName]: enabled }
-      }));
-    },
-    setCollectionChanges: (fieldName: string, changes: FormCustomizationCollectionFieldState) => {
-      const componentChanges: CollectionFieldState = {
-        added: changes.added as CollectionItem[],
-        modified: changes.modified as CollectionItem[],
-        deleted: changes.deleted as CollectionItem[]
-      };
-      updateCollectionState(fieldName, componentChanges);
-    },
-    setFormMessage: (message: FormMessage) => {
-      setFormMessage(message);
-    },
-    setError: (errorMessage: string) => {
-      setError(errorMessage);
-    }
-  }), [ updateCollectionState, setCustomizationState, setFormData, setFormMessage, setError]);
-
-  // Helper function to get entity name from i18n
-  const getEntityName = React.useCallback((pluralName: string, form: 'single' | 'plural'): string => {
-    if (!schemaData) return `entity.${pluralName}.${form}`;
-    
-    // Get the proper entity type name from schema
-    const entityTypeNameForI18n = getElementTypeNameOfListField(schemaData as SchemaData, pluralName);
-    if (!entityTypeNameForI18n) return `entity.${pluralName}.${form}`;
-    
-    // Convert to lowercase for i18n key
-    const baseName = entityTypeNameForI18n.toLowerCase();
-    
-    return `entity.${baseName}.${form}`;
-  }, [schemaData]);
-
-  // Form customization actions
-  const customizationActions: FormCustomizationActions = React.useMemo(() => ({
-    setFieldData: (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => {
       // Check if this is an embedded field (contains a dot)
-      if (fieldName.includes('.')) {
+      if (typeof fieldName === 'string' && fieldName.includes('.')) {
         const [parentField, embeddedField] = fieldName.split('.');
         const fullFieldName = `${parentField}.${embeddedField}`;
         
@@ -337,14 +287,17 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
           ...prev,
           [fullFieldName]: { 
             ...prev[fullFieldName], 
-            value: value === null ? "" : value 
+            value: (value === null ? "" : value) as string | number | boolean | string[] | null | { id: string; [key: string]: unknown }
           }
         }));
       } else {
         // Regular field
         setFormData(prev => ({
           ...prev,
-          [fieldName]: { ...prev[fieldName], value }
+          [fieldName]: { 
+            ...prev[fieldName], 
+            value: value as string | number | boolean | string[] | null | { id: string; [key: string]: unknown } 
+          }
         }));
       }
     },
@@ -366,17 +319,45 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
         fieldOrder
       }));
     },
-  }), []);
+    setCollectionChanges: (fieldName: string, changes: FormCustomizationCollectionFieldState) => {
+      const componentChanges: CollectionFieldState = {
+        added: changes.added as CollectionItem[],
+        modified: changes.modified as CollectionItem[],
+        deleted: changes.deleted as CollectionItem[]
+      };
+      updateCollectionState(fieldName, componentChanges);
+    },
+    setFormMessage: (message: FormMessage) => {
+      setFormMessage(message);
+    },
+    setError: (errorMessage: string) => {
+      setError(errorMessage);
+    }
+  }), [updateCollectionState, setCustomizationState, setFormData, setFormMessage, setError]);
+
+  // Helper function to get entity name from i18n
+  const getEntityName = React.useCallback((pluralName: string, form: 'single' | 'plural'): string => {
+    if (!schemaData) return `entity.${pluralName}.${form}`;
+    
+    // Get the proper entity type name from schema
+    const entityTypeNameForI18n = getElementTypeNameOfListField(schemaData as SchemaData, pluralName);
+    if (!entityTypeNameForI18n) return `entity.${pluralName}.${form}`;
+    
+    // Convert to lowercase for i18n key
+    const baseName = entityTypeNameForI18n.toLowerCase();
+    
+    return `entity.${baseName}.${form}`;
+  }, [schemaData]);
 
   // Parent form access for collection items
   const parentFormAccess: ParentFormAccess = React.useMemo(() => ({
     parentFormData: formData,
     parentFieldVisibility: customizationState.fieldVisibility,
     parentFieldEnabled: customizationState.fieldEnabled,
-    setParentFieldData: customizationActions.setFieldData,
-    setParentFieldVisible: customizationActions.setFieldVisible,
-    setParentFieldEnabled: customizationActions.setFieldEnabled,
-  }), [formData, customizationState.fieldVisibility, customizationState.fieldEnabled, customizationActions]);
+    setParentFieldData: formActions.setFieldData,
+    setParentFieldVisible: formActions.setFieldVisible,
+    setParentFieldEnabled: formActions.setFieldEnabled,
+  }), [formData, customizationState.fieldVisibility, customizationState.fieldEnabled, formActions]);
 
   // Build form fields based on schema first
   const formFields = React.useMemo(() => {
@@ -1321,8 +1302,8 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     }
     const callbacks = getEntityFormCallbacks(entityTypeName, action);
     
-    // Create callback actions
-    const callbackActions = createCallbackActions();
+    // Use unified form actions
+    const callbackActions = formActions;
 
     setLoading(true);
     setError(null);
@@ -1469,7 +1450,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
       
       // Execute onBeforeSubmit callback if available
       if (action.onBeforeSubmit) {
-        const result = await action.onBeforeSubmit(formData, collectionChanges as Record<string, FormCustomizationCollectionFieldState>, stateMachineDataInput, createCallbackActions());
+        const result = await action.onBeforeSubmit(formData, collectionChanges as Record<string, FormCustomizationCollectionFieldState>, stateMachineDataInput, formActions);
         
         if (!result.shouldProceed) {
           if (result.error) {
@@ -1496,7 +1477,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
       
       // Execute onSuccess callback if available
       if (action.onSuccess) {
-        await action.onSuccess(result.data, formData, collectionChanges as Record<string, FormCustomizationCollectionFieldState>, transformedData, createCallbackActions());
+        await action.onSuccess(result.data, formData, collectionChanges as Record<string, FormCustomizationCollectionFieldState>, transformedData, formActions);
       }
       
       // Invalidate and refetch both the specific entity and list queries (same as regular form submission)
@@ -1512,7 +1493,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
       
       // Execute onError callback if available
       if (action.onError) {
-        await action.onError(error as Error, formData, collectionChanges as Record<string, FormCustomizationCollectionFieldState>, transformedData, createCallbackActions());
+        await action.onError(error as Error, formData, collectionChanges as Record<string, FormCustomizationCollectionFieldState>, transformedData, formActions);
       } else {
         // Default error handling
         setError(`Failed to ${actionName} entity: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1561,7 +1542,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
         <Grid key={field.name} size={sectionSize}>
           {customEmbeddedRenderer(
             field,
-            customizationActions,
+            formActions,
             handleEmbeddedFieldChange,
             action === "view" || !isSectionEnabled || !enabled,
             formData
@@ -1609,7 +1590,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                         if (customOnChange) {
                           // Convert unknown value to the expected type
                           const typedValue = value as string | number | boolean | string[] | null;
-                          const result = customOnChange(embeddedFieldName, typedValue, formData, customizationActions.setFieldData, customizationActions.setFieldVisible, customizationActions.setFieldEnabled);
+                          const result = customOnChange(embeddedFieldName, typedValue, formData, formActions.setFieldData, formActions.setFieldVisible, formActions.setFieldEnabled);
                           // Pass both value and error to handleEmbeddedFieldChange
                           handleEmbeddedFieldChange(field.name, embeddedFieldName, result.value as string | number | boolean | string[] | null, result.error);
                         } else {
@@ -1655,7 +1636,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     if (customRenderer) {
       return (customRenderer as (field: FormField, actions: FormCustomizationActions, handler: (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => void, disabled: boolean, formData: Record<string, unknown>) => React.ReactElement)(
         field,
-        customizationActions,
+        formActions,
         (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => 
           handleFieldChange(fieldName, value),
         isViewMode || !enabled || isStateMachineField,
@@ -1666,7 +1647,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     // Use custom onChange if provided, otherwise use the default handleFieldChange
     const onChange = customOnChange 
       ? (value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => {
-          const result = customOnChange(field.name, value, formData, customizationActions.setFieldData, customizationActions.setFieldVisible, customizationActions.setFieldEnabled, undefined);
+          const result = customOnChange(field.name, value, formData, formActions.setFieldData, formActions.setFieldVisible, formActions.setFieldEnabled, undefined);
           // Pass both value and error to handleFieldChange to handle state properly
           handleFieldChange(field.name, result.value as string | number | boolean | string[] | null | { id: string; [key: string]: unknown }, result.error);
         }
@@ -1973,7 +1954,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                       formData, 
                       collectionChanges as Record<string, FormCustomizationCollectionFieldState>, 
                       transformedData, 
-                      createCallbackActions()
+                      formActions
                     );
                     
                     // If callback explicitly returns false, stop navigation
@@ -2008,7 +1989,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                       formData, 
                       collectionChanges as Record<string, FormCustomizationCollectionFieldState>, 
                       transformedData, 
-                      createCallbackActions()
+                      formActions
                     );
                     
                     // If callback explicitly returns false, stop navigation
@@ -2108,7 +2089,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                       {/* Render custom step renderer if available */}
                       {currentStep?.customStepRenderer ? (
                         currentStep.customStepRenderer(
-                          customizationActions,
+                          formActions,
                           handleFieldChange,
                           handleEmbeddedFieldChange,
                           action === "view",
@@ -2274,7 +2255,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                           {currentStep?.actions?.map((stepAction) => (
                             <React.Fragment key={stepAction.name}>
                               {stepAction.renderer(
-                                createCallbackActions(),
+                                formActions,
                                 formData,
                                 getCollectionChanges(),
                                 action
