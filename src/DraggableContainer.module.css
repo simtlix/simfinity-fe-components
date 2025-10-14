@@ -1,8 +1,0 @@
-.container {
-  overflow: hidden;
-  cursor: grab;
-}
-
-.container:active {
-  cursor: grabbing;
-}

@@ -8,7 +8,7 @@ interface DraggableContainerProps {
   children: React.ReactNode;
 }
 
-export default function DraggableContainer({
+export default function DraggablePanel({
   containerRef,
   children,
 }: DraggableContainerProps) {

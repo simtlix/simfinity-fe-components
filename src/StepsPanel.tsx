@@ -1,5 +1,5 @@
 import LinearStepperButtonIcon from './LinearStepperButtonIcon';
-import DraggableContainer from './DraggableContainer';
+import DraggablePanel from './DraggablePanel';
 import {
   Paper,
   Step,
@@ -17,7 +17,7 @@ export enum variants {
   linear = 'linear',
 }
 
-interface CustomStepperProps {
+interface StepsPanelProps {
   steps: Array<{
     id: number;
     label: string;
@@ -30,13 +30,13 @@ interface CustomStepperProps {
   variant?: variants;
 }
 
-export default function CustomStepper({
+export default function StepsPanel({
   activeStep,
   steps,
   allowClickBack,
   handleStepClick,
   variant = variants.classic,
-}: CustomStepperProps) {
+}: StepsPanelProps) {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,7 +85,7 @@ export default function CustomStepper({
 
   return (
     <Paper sx={{ overflow: 'hidden' }}>
-      <DraggableContainer containerRef={containerRef}>
+      <DraggablePanel containerRef={containerRef}>
         <Stepper
           activeStep={activeStep}
           orientation={orientation}
@@ -135,7 +135,7 @@ export default function CustomStepper({
               ),
           )}
         </Stepper>
-      </DraggableContainer>
+      </DraggablePanel>
     </Paper>
   );
 }

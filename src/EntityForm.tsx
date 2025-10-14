@@ -24,7 +24,7 @@ import {
   FormHelperText,
   Menu,
 } from "@mui/material";
-import CustomStepper, { variants } from "./Stepper";
+import StepsPanel, { variants } from "./StepsPanel";
 
 // GraphQL queries and mutations
 const GET_ENTITY_QUERY = gql`
@@ -2085,7 +2085,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
               return (
                 <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                   {/* Stepper component on the left (or top on mobile) */}
-                  <CustomStepper
+                  <StepsPanel
                     activeStep={currentStepIndex}
                     steps={stepperSteps}
                     handleStepClick={handleStepClick}

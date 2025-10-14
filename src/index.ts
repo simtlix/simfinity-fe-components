@@ -8,7 +8,7 @@ export * from './hooks';
 export * from './lib';
 
 // Stepper Component
-export { default as CustomStepper, variants as StepperVariants } from './Stepper';
+export { default as CustomStepper, variants as StepperVariants } from './StepsPanel';
 
 // Types
 export type {
