@@ -91,6 +91,18 @@ export default function DraggableContainer({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
+      sx={{
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        cursor: isDragging || isTouching ? 'grabbing' : 'grab',
+        userSelect: 'none',
+        WebkitOverflowScrolling: 'touch',
+        '&::-webkit-scrollbar': {
+          display: 'none',
+        },
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      }}
     >
       {children}
     </Box>

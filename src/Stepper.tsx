@@ -84,12 +84,16 @@ export default function CustomStepper({
   }, [activeStep, steps]);
 
   return (
-    <Paper>
+    <Paper sx={{ overflow: 'hidden' }}>
       <DraggableContainer containerRef={containerRef}>
         <Stepper
           activeStep={activeStep}
           orientation={orientation}
           connector={<StepConnector />}
+          sx={{
+            flexWrap: 'nowrap',
+            minWidth: 'max-content',
+          }}
         >
           {steps.map(
             (step, index) =>
