@@ -8,7 +8,6 @@ import {
   Breadcrumbs,
   Button,
   CircularProgress,
-  Divider,
   FormControlLabel,
   Link,
   Paper,
@@ -2182,7 +2181,6 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                             
                             return (
                               <>
-                                <Divider sx={{ my: 3 }} />
                                 {sortedEmbeddedFields.map(field => renderEmbeddedSection(field, true))}
                               </>
                             );
@@ -2361,7 +2359,6 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                 
                 return (
                   <>
-                    <Divider sx={{ my: 3 }} />
                     {sortedEmbeddedFields.map(field => renderEmbeddedSection(field, true))}
                   </>
                 );
