@@ -113,6 +113,7 @@ export type FieldCustomization = {
   visible?: boolean | ((fieldName: string, value: unknown, formData: Record<string, unknown>) => boolean);
   order?: number;
   stepId?: string; // Optional: step where this field should be displayed in stepper mode
+  transient?: boolean; // Optional: if true, field is not included in mutations (requires customRenderer)
   onChange?: (
     fieldName: string,
     value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown },

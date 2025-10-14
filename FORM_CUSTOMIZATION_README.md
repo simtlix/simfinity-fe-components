@@ -403,6 +403,9 @@ type FieldCustomization = {
   // Display order
   order?: number;
   
+  // Transient field (excluded from mutations, requires customRenderer)
+  transient?: boolean;
+  
   // Change handler
   onChange?: (fieldName, value, formData, setFieldData, setFieldVisible, setFieldEnabled, parentFormAccess?) => {
     value: any;
@@ -410,7 +413,7 @@ type FieldCustomization = {
   };
   
   // Custom renderer
-  customRenderer?: (field, customizationActions, handleFieldChange, disabled) => React.ReactElement;
+  customRenderer?: (field, customizationActions, handleFieldChange, disabled, formData) => React.ReactElement;
 };
 ```
 
@@ -475,7 +478,7 @@ registerFormCustomization('Series', 'create', {
 registerFormCustomization('Series', 'create', {
   fieldsCustomization: {
     coverImage: {
-      customRenderer: (field, customizationActions, handleFieldChange, disabled) => {
+      customRenderer: (field, customizationActions, handleFieldChange, disabled, formData) => {
         return (
           <ImageUploader
             value={field.value as string}
@@ -489,6 +492,73 @@ registerFormCustomization('Series', 'create', {
   }
 });
 ```
+
+#### Transient Fields
+
+Transient fields are custom fields that are displayed in the form but **not included in mutations**. They're useful for:
+- Calculated/computed fields
+- UI-only controls (filters, toggles, etc.)
+- Temporary user input that affects other fields
+
+**Requirements:**
+- Must set `transient: true`
+- Must provide a `customRenderer`
+- Field data is available in `formData` but excluded from mutations
+
+```tsx
+registerFormCustomization('Series', 'create', {
+  fieldsCustomization: {
+    // Transient field for calculating total episodes
+    totalEpisodes: {
+      transient: true, // This field won't be sent to the server
+      size: { xs: 12, md: 6 },
+      customRenderer: (field, customizationActions, handleFieldChange, disabled, formData) => {
+        // Calculate total from seasons collection
+        const seasons = formData.seasons || [];
+        const total = seasons.reduce((sum, season) => sum + (season.episodeCount || 0), 0);
+        
+        return (
+          <TextField
+            fullWidth
+            label="Total Episodes (Calculated)"
+            value={total}
+            disabled={true}
+            helperText="Auto-calculated from seasons"
+          />
+        );
+      }
+    },
+    
+    // Transient field for UI control
+    showAdvanced: {
+      transient: true, // UI toggle, not saved
+      customRenderer: (field, customizationActions, handleFieldChange, disabled, formData) => {
+        return (
+          <FormControlLabel
+            control={
+              <Switch
+                checked={field.value as boolean}
+                onChange={(e) => {
+                  handleFieldChange(field.name, e.target.checked);
+                  // Show/hide advanced fields based on toggle
+                  customizationActions.setFieldVisible('advancedOptions', e.target.checked);
+                }}
+              />
+            }
+            label="Show Advanced Options"
+          />
+        );
+      }
+    }
+  }
+});
+```
+
+**Important Notes:**
+- Transient fields are skipped in `transformFormDataForMutation`
+- They appear in `formData` for use in callbacks and other field logic
+- Perfect for calculated fields, UI controls, and temporary state
+- Can be used with `onChange` to affect other fields
 
 #### Responsive Field Sizing
 

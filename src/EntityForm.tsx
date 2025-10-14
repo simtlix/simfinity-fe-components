@@ -1202,6 +1202,15 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     
     // Then transform non-collection fields
     formFields.forEach(field => {
+      // Check if field is transient (not included in mutations)
+      const fieldCustomization = customizationState.customization[field.name];
+      const isTransient = typeof fieldCustomization === 'object' && fieldCustomization !== null && 'transient' in fieldCustomization && (fieldCustomization as { transient?: boolean }).transient === true;
+      
+      if (isTransient) {
+        console.log(`Skipping transient field ${field.name} in mutation`);
+        return; // Skip transient fields
+      }
+      
       if (!field.isCollection && !field.isStateMachine) { // Skip collection fields and state machine fields
         if (field.isEmbedded) {
           // Handle embedded object fields (like director in the example)
@@ -1293,7 +1302,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     });
     
     return transformedData;
-  }, [formFields, transformCollectionDataForMutation, action]);
+  }, [formFields, transformCollectionDataForMutation, action, customizationState]);
 
 
 
