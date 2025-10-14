@@ -73,7 +73,7 @@ export default function CollectionFieldGrid({
   parentFormAccess
 }: CollectionFieldGridProps) {
   const { data: schemaData } = useQuery(INTROSPECTION_QUERY);
-  const { resolveLabel } = useI18n();
+  const { resolveLabel, locale } = useI18n();
   
   // Helper function to get entity name from i18n
   const getEntityName = (pluralName: string, form: 'single' | 'plural'): string => {
@@ -629,7 +629,7 @@ export default function CollectionFieldGrid({
           ? t('footer.rowsSelected', `${count.toLocaleString()} rows selected`)
           : t('footer.rowSelected', `${count.toLocaleString()} row selected`),
     } as const;
-  }, [resolveLabel, collectionField.objectTypeName]);
+  }, [resolveLabel, collectionField.objectTypeName, locale]);
 
   if (!collectionQuery) {
     return (

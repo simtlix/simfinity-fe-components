@@ -42,7 +42,7 @@ function EntityTable({
 }: EntityTableProps) {
   const client = useApolloClient();
   const { data: schemaData } = useQuery(INTROSPECTION_QUERY);
-  const { resolveLabel } = useI18n();
+  const { resolveLabel, locale } = useI18n();
   
   // URL parameters handling - use provided function or fallback to window.location
   const searchParams = React.useMemo(() => {
@@ -558,7 +558,7 @@ function EntityTable({
           ? t('footer.rowsSelected', `${count.toLocaleString()} rows selected`)
           : t('footer.rowSelected', `${count.toLocaleString()} row selected`),
     } as const;
-  }, [resolveLabel, listField]);
+  }, [resolveLabel, listField, locale]);
 
   return (
     <Box sx={{ p: 3 }}>
