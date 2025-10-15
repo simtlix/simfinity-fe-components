@@ -1,5 +1,6 @@
 import * as React from "react";
-import { useQuery, gql } from "@apollo/client";
+import { useQuery } from "urql";
+import { gql } from "graphql-tag";
 import {
   Box,
   Chip,
@@ -129,14 +130,15 @@ export default function ObjectFieldSelector({
   }, [listQueryName, descriptionField, descriptionFieldType]);
 
   // Fetch search results when search term is 1+ characters
-  const { data: searchData, loading: searchLoading, error: searchError } = useQuery(generateSearchQuery!, {
+  const [{ data: searchData, fetching: searchLoading, error: searchError }] = useQuery({
+    query: generateSearchQuery!,
     variables: {
       page: 1,
       size: 10,
       count: false,
       searchTerm: castSearchTerm(searchTerm, descriptionFieldType),
     },
-    skip: searchTerm.length < 1 || !isOpen || !generateSearchQuery,
+    pause: searchTerm.length < 1 || !isOpen || !generateSearchQuery,
   });
 
   // Log any search errors
@@ -168,13 +170,11 @@ export default function ObjectFieldSelector({
   }, [singleQueryName, descriptionField]);
 
   // Load selected object data when value changes
-  const { data: selectedData, error: selectedError } = useQuery(
-    generateSelectedObjectQuery!,
-    {
-      variables: { id: typeof value === 'string' ? value : (value as { id: string; [key: string]: unknown })?.id },
-      skip: !value || !generateSelectedObjectQuery,
-    }
-  );
+  const [{ data: selectedData, error: selectedError }] = useQuery({
+    query: generateSelectedObjectQuery!,
+    variables: { id: typeof value === 'string' ? value : (value as { id: string; [key: string]: unknown })?.id },
+    pause: !value || !generateSelectedObjectQuery,
+  });
 
   // Log any selected object errors
   React.useEffect(() => {

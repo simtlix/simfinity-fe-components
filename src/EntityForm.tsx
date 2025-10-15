@@ -1,5 +1,6 @@
 import * as React from "react";
-import { useQuery, useMutation, gql, useApolloClient } from "@apollo/client";
+import { useQuery, useMutation, useClient } from "urql";
+import { gql } from "graphql-tag";
 import { getEntityFormCallbacks, EntityFormCallbackActions, FormMessage, CollectionFieldState as FormCustomizationCollectionFieldState, ParentFormAccess, FormStep } from "./lib/formCustomization";
 import { getEntityStateMachine, getAvailableStateMachineActions, hasStateMachineSupport } from "./lib/stateMachineRegistry";
 import { resolveStateMachineActionLabel } from "./lib/i18n";
@@ -234,7 +235,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     }
   }, [onNavigate]);
   const { resolveLabel } = useI18n();
-  const client = useApolloClient();
+  const client = useClient();
   const [formData, setFormData] = React.useState<FormData>({} as FormData);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -257,7 +258,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
   });
 
   // Get schema data to understand entity structure
-  const { data: schemaData, loading: schemaLoading, error: schemaError } = useQuery(INTROSPECTION_QUERY);
+  const [{ data: schemaData, fetching: schemaLoading, error: schemaError }] = useQuery({ query: INTROSPECTION_QUERY });
   
 
 
@@ -643,13 +644,11 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
   }, [entityTypeName, formFields]);
 
   // Fetch entity data for edit/view mode
-  const { data: entityData, loading: entityLoading, error: entityError } = useQuery(
-    generateQueries?.getQuery || GET_ENTITY_QUERY,
-    {
-      variables: { id: entityId },
-      skip: !entityId || !generateQueries?.getQuery || action === "create",
-    }
-  );
+  const [{ data: entityData, fetching: entityLoading, error: entityError }] = useQuery({
+    query: generateQueries?.getQuery || GET_ENTITY_QUERY,
+    variables: { id: entityId },
+    pause: !entityId || !generateQueries?.getQuery || action === "create",
+  });
 
   console.log('Query execution:', {
     entityId,
@@ -662,11 +661,11 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
   });
 
   // Mutations for create and update
-  const [addEntity, { loading: createLoading }] = useMutation(
+  const [{ fetching: createLoading }, addEntity] = useMutation(
     generateQueries?.createMutation || CREATE_ENTITY_MUTATION
   );
   
-  const [updateEntity, { loading: updateLoading }] = useMutation(
+  const [{ fetching: updateLoading }, updateEntity] = useMutation(
     generateQueries?.updateMutation || UPDATE_ENTITY_MUTATION
   );
 
@@ -1122,39 +1121,18 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     return transformedCollections;
   }, [formFields, convertCollectionItemTypes, cleanCollectionItemObjectFields, deepCleanCollectionItem, schemaData]);
 
-  // Cache invalidation functions
+  // Cache invalidation functions (URQL handles cache differently - using network-only request policy)
   const invalidateEntityListCache = React.useCallback(async (entityType: string) => {
-    try {
-      // Evict all queries that contain the entity type name
-      await client.resetStore();
-      
-      console.log(`🗑️ Invalidated cache for entity type: ${entityType}`);
-    } catch (error) {
-      console.error(`Error invalidating cache for ${entityType}:`, error);
-    }
-  }, [client]);
+    // URQL cache is invalidated automatically with requestPolicy: 'network-only' in the client config
+    // No manual cache invalidation needed - the next query will fetch fresh data
+    console.log(`🗑️ Cache invalidation noted for entity type: ${entityType} (URQL will refetch)`);
+  }, []);
 
   const invalidateEntityCache = React.useCallback(async (entityId: string, entityType: string) => {
-    try {
-      // Get the entity name (singular form)
-      const entityName = entityType.slice(0, -1); // Remove 's' from end
-      
-      // Evict the specific entity from cache
-      client.cache.evict({ 
-        id: client.cache.identify({ 
-          __typename: entityName.charAt(0).toUpperCase() + entityName.slice(1), 
-          id: entityId 
-        }) 
-      });
-      
-      // Also evict any list queries that might contain this entity
-      client.cache.gc();
-      
-      console.log(`🗑️ Invalidated cache for entity ${entityId} of type ${entityType}`);
-    } catch (error) {
-      console.error(`Error invalidating cache for entity ${entityId}:`, error);
-    }
-  }, [client]);
+    // URQL cache is invalidated automatically with requestPolicy: 'network-only' in the client config
+    // No manual cache invalidation needed - the next query will fetch fresh data
+    console.log(`🗑️ Cache invalidation noted for entity ID: ${entityId}, type: ${entityType} (URQL will refetch)`);
+  }, []);
 
   // Transform form data for Simfinity mutation submission
   const transformFormDataForMutation = React.useCallback((formData: FormData, collectionChanges?: Record<string, CollectionFieldState>): Record<string, unknown> => {
@@ -1327,20 +1305,18 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
       let result: unknown;
       
       if (action === "create") {
-        result = await addEntity({
-          variables: { input: transformedData }
-        });
-        console.log('Entity created:', (result as { data: unknown }).data);
+        const mutationResult = await addEntity({ input: transformedData });
+        result = mutationResult;
+        console.log('Entity created:', mutationResult.data);
         
         // Invalidate and refetch list queries for the entity type
         await invalidateEntityListCache(listField);
       } else if (action === "edit") {
         // For update mutations, include the ID inside the input
         const updateInput = { id: entityId, ...transformedData };
-        result = await updateEntity({
-          variables: { input: updateInput }
-        });
-        console.log('Entity updated:', (result as { data: unknown }).data);
+        const mutationResult = await updateEntity({ input: updateInput });
+        result = mutationResult;
+        console.log('Entity updated:', mutationResult.data);
         
         // Invalidate and refetch both the specific entity and list queries
         await invalidateEntityCache(entityId!, listField);
@@ -1455,10 +1431,11 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
         }
       `;
       
-      const result = await client.mutate({
-        mutation,
-        variables: { input: stateMachineDataInput }
-      });
+      const result = await client.mutation(mutation, { input: stateMachineDataInput }).toPromise();
+      
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
       
       // Execute onSuccess callback if available
       if (action.onSuccess) {

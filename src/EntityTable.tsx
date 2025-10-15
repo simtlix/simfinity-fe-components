@@ -1,5 +1,6 @@
 import * as React from "react";
-import { gql, useApolloClient, useQuery } from "@apollo/client";
+import { gql } from "graphql-tag";
+import { useClient, useQuery } from "urql";
 import { Box, CircularProgress, Paper, Typography, Button, Stack, IconButton, Tooltip, TablePagination } from "@mui/material";
 import { DataGrid, type GridColDef, type GridPaginationModel, type GridFilterModel, type GridFilterOperator, getGridNumericOperators, getGridBooleanOperators, GridFilterInputValue } from "@mui/x-data-grid";
 import ServerToolbar from "./ServerToolbar";
@@ -40,8 +41,8 @@ function EntityTable({
   getSearchParams,
   onSearchParamsChange 
 }: EntityTableProps) {
-  const client = useApolloClient();
-  const { data: schemaData } = useQuery(INTROSPECTION_QUERY);
+  const client = useClient();
+  const [{ data: schemaData }] = useQuery({ query: INTROSPECTION_QUERY });
   const { resolveLabel, locale } = useI18n();
   
   // URL parameters handling - use provided function or fallback to window.location
@@ -142,7 +143,7 @@ function EntityTable({
   const [page, setPage] = React.useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = React.useState<number>(10);
   const [rows, setRows] = React.useState<Row[]>([]);
-  const [totalCount, setTotalCount] = React.useState<number | null>(null);
+  const [totalCount, setTotalCount] = React.useState<number>(0);
   const [loadingData, setLoadingData] = React.useState<boolean>(false);
   const [errorData, setErrorData] = React.useState<string | null>(null);
   const [sortModel, setSortModel] = React.useState<{ field: string; sort: 'asc' | 'desc' }[]>([]);
@@ -324,26 +325,35 @@ function EntityTable({
         })()
       : null;
     client
-      .query({
-        query: buildPaginatedListQuery(listField, selection, sortBlock, filterBlock),
-        variables: {
+      .query(
+        buildPaginatedListQuery(listField, selection, sortBlock, filterBlock),
+        {
           page: page + 1,
           size: rowsPerPage,
           count: true,
         },
-        fetchPolicy: "network-only",
-      })
+        {
+          requestPolicy: "network-only",
+        }
+      )
+      .toPromise()
       .then((result) => {
+        console.log('result', result);
         if (cancelled) return;
+        
+        if (result.error) {
+          setErrorData(result.error.message);
+          return;
+        }
+        
         const raw = (result.data?.[listField] as unknown) as Row[] | undefined;
         setRows(Array.isArray(raw) ? raw : []);
-        // Apollo doesn't expose extensions directly on result, but on the response context.
-        // However, simfinity returns count in the top-level extensions of the HTTP response.
-        // We can read it via the legacy __response field if present, otherwise default to null.
-        const anyResult = result as unknown as { extensions?: Record<string, unknown> };
-        const ext = anyResult.extensions;
+        
+        // URQL automatically includes extensions in the response
+        const ext = result.extensions as Record<string, unknown> | undefined;
+        console.log('ext', ext);
         const c = typeof ext?.count === "number" ? (ext.count as number) : null;
-        setTotalCount(c);
+        setTotalCount(c ?? 0);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -532,7 +542,7 @@ function EntityTable({
     () => () => (
       <TablePagination
         component="div"
-        count={totalCount ?? gridRows.length}
+        count={totalCount}
         page={page}
         rowsPerPage={rowsPerPage}
         onPageChange={(_, newPage) => setPage(newPage)}
@@ -548,7 +558,7 @@ function EntityTable({
         }}
       />
     ),
-    [locale, totalCount, gridRows.length, page, rowsPerPage, resolveLabel, listField]
+    [locale, totalCount, page, rowsPerPage, resolveLabel, listField]
   );
 
   const localeText = React.useMemo(() => {
@@ -614,6 +624,7 @@ function EntityTable({
             localeText={localeText}
             loading={loadingData}
             rowCount={totalCount ?? gridRows.length}
+            pagination
             paginationMode="server"
             paginationModel={{ page, pageSize: rowsPerPage } as GridPaginationModel}
             onPaginationModelChange={(model) => {

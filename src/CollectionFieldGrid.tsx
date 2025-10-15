@@ -1,5 +1,6 @@
 import * as React from "react";
-import { gql, useQuery } from "@apollo/client";
+import { useQuery } from "urql";
+import { gql } from "graphql-tag";
 import { 
   Box, 
   CircularProgress, 
@@ -73,7 +74,7 @@ export default function CollectionFieldGrid({
   onCollectionStateChange,
   parentFormAccess
 }: CollectionFieldGridProps) {
-  const { data: schemaData } = useQuery(INTROSPECTION_QUERY);
+  const [{ data: schemaData }] = useQuery({ query: INTROSPECTION_QUERY });
   const { resolveLabel, locale } = useI18n();
   
   // Helper function to get entity name from i18n
@@ -259,14 +260,15 @@ export default function CollectionFieldGrid({
   }, [collectionField, selection, schemaData, sortModel, sortFieldByColumn, isEditMode, currentState.modified, currentState.deleted]); // Note: currentState.added is intentionally NOT included since added items don't affect the query
 
   // Execute the collection query
-  const { data: collectionData, loading: collectionLoading, error: collectionError } = useQuery(collectionQuery!, {
+  const [{ data: collectionData, fetching: collectionLoading, error: collectionError }] = useQuery({
+    query: collectionQuery!,
     variables: {
       parentId: parentEntityId,
       page: page + 1, // Convert to 1-based for GraphQL
       size: rowsPerPage,
       count: true,
     },
-    skip: !collectionQuery || !parentEntityId,
+    pause: !collectionQuery || !parentEntityId,
   });
 
   // Log collection query execution
@@ -630,7 +632,7 @@ export default function CollectionFieldGrid({
     () => () => (
       <TablePagination
         component="div"
-        count={totalCount}
+        count={totalCount ?? -1}
         page={page}
         rowsPerPage={rowsPerPage}
         onPageChange={(_, newPage) => setPage(newPage)}

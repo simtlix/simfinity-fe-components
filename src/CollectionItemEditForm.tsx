@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useQuery } from "@apollo/client";
+import { useQuery } from "urql";
 import {
   Dialog,
   DialogTitle,
@@ -99,7 +99,7 @@ export default function CollectionItemEditForm({
   isAddingNew = false,
   parentFormAccess,
 }: CollectionItemEditFormProps) {
-  const { data: schemaData } = useQuery(INTROSPECTION_QUERY);
+  const [{ data: schemaData }] = useQuery({ query: INTROSPECTION_QUERY });
   const { resolveLabel } = useI18n();
   const [formData, setFormData] = React.useState<FormData>({} as FormData);
   const [loading, setLoading] = React.useState(false);

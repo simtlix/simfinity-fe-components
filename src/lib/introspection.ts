@@ -1,4 +1,4 @@
-import { gql } from "@apollo/client";
+import { gql } from "graphql-tag";
 
 export const INTROSPECTION_QUERY = gql`
   query IntrospectionQuery {
