@@ -18,7 +18,8 @@ import {
   Paper,
   IconButton,
   Tooltip,
-  Alert
+  Alert,
+  TablePagination
 } from "@mui/material";
 import { DataGrid, type GridColDef, type GridPaginationModel } from "@mui/x-data-grid";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -625,6 +626,29 @@ export default function CollectionFieldGrid({
     };
   }, [resolveLabel, collectionField.objectTypeName, locale]);
 
+  const PaginationComponent = React.useMemo(
+    () => () => (
+      <TablePagination
+        component="div"
+        count={totalCount}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(e) => {
+          setRowsPerPage(parseInt(e.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[5, 10, 25]}
+        labelRowsPerPage={resolveLabel(['grid.pagination.rowsPerPage'], { entity: collectionField.objectTypeName }, 'Rows per page:')}
+        labelDisplayedRows={({ from, to, count }: { from: number; to: number; count: number }) => {
+          const template = resolveLabel(['grid.pagination.displayedRows'], { entity: collectionField.objectTypeName }, '{from}–{to} de {count}');
+          return template.replace('{from}', from.toString()).replace('{to}', to.toString()).replace('{count}', (count !== -1 ? count : `more than ${to}`).toString());
+        }}
+      />
+    ),
+    [locale, totalCount, page, rowsPerPage, resolveLabel, collectionField.objectTypeName]
+  );
+
   if (!collectionQuery) {
     return (
       <Accordion defaultExpanded>
@@ -699,12 +723,8 @@ export default function CollectionFieldGrid({
                       }}
                       loading={collectionLoading}
                       localeText={localeText}
-                      slotProps={{
-                        pagination: {
-                          labelRowsPerPage: resolveLabel(['grid.pagination.rowsPerPage'], { entity: collectionField.objectTypeName }, 'Rows per page:'),
-                          labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) =>
-                            resolveLabel(['grid.pagination.displayedRows'], { entity: collectionField.objectTypeName }, `${from}–${to} of ${count !== -1 ? count : `more than ${to}`}`),
-                        },
+                      slots={{
+                        pagination: PaginationComponent,
                       }}
                       disableRowSelectionOnClick
                     />

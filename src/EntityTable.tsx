@@ -1,6 +1,6 @@
 import * as React from "react";
 import { gql, useApolloClient, useQuery } from "@apollo/client";
-import { Box, CircularProgress, Paper, Typography, Button, Stack, IconButton, Tooltip } from "@mui/material";
+import { Box, CircularProgress, Paper, Typography, Button, Stack, IconButton, Tooltip, TablePagination } from "@mui/material";
 import { DataGrid, type GridColDef, type GridPaginationModel, type GridFilterModel, type GridFilterOperator, getGridNumericOperators, getGridBooleanOperators, GridFilterInputValue } from "@mui/x-data-grid";
 import ServerToolbar from "./ServerToolbar";
 import ServerFilterPanel from "./ServerFilterPanel";
@@ -528,6 +528,29 @@ function EntityTable({
     return rows.map((row, idx) => ({ __rid: String((row as Record<string, unknown>)["id"] ?? `${listField}-${page}-${idx}`), ...row }));
   }, [rows, listField, page]);
 
+  const PaginationComponent = React.useMemo(
+    () => () => (
+      <TablePagination
+        component="div"
+        count={totalCount ?? gridRows.length}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(e) => {
+          setRowsPerPage(parseInt(e.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        labelRowsPerPage={resolveLabel(['grid.pagination.rowsPerPage'], { entity: listField }, 'Rows per page:')}
+        labelDisplayedRows={({ from, to, count }: { from: number; to: number; count: number }) => {
+          const template = resolveLabel(['grid.pagination.displayedRows'], { entity: listField }, '{from}–{to} de {count}');
+          return template.replace('{from}', from.toString()).replace('{to}', to.toString()).replace('{count}', (count !== -1 ? count : `more than ${to}`).toString());
+        }}
+      />
+    ),
+    [locale, totalCount, gridRows.length, page, rowsPerPage, resolveLabel, listField]
+  );
+
   const localeText = React.useMemo(() => {
     const t = (k: string, d: string) => resolveLabel([`grid.${k}`], { entity: listField }, d);
     return {
@@ -644,13 +667,7 @@ function EntityTable({
                   }}
                 />
               ),
-            }}
-            slotProps={{
-              pagination: {
-                labelRowsPerPage: resolveLabel(['grid.pagination.rowsPerPage'], { entity: listField }, 'Rows per page:'),
-                labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) =>
-                  resolveLabel(['grid.pagination.displayedRows'], { entity: listField }, `${from}–${to} of ${count !== -1 ? count : `more than ${to}`}`),
-              },
+              pagination: PaginationComponent,  
             }}
             disableRowSelectionOnClick
             sx={{ border: 0 }}
