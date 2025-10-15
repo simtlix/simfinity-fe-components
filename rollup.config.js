@@ -45,7 +45,8 @@ export default [
     external: [
       'react',
       'react-dom',
-      '@apollo/client',
+      'urql',
+      'graphql-tag',
       '@emotion/react',
       '@emotion/styled',
       '@mui/material',
@@ -91,7 +92,8 @@ export default [
     external: [
       'react',
       'react-dom',
-      '@apollo/client',
+      'urql',
+      'graphql-tag',
       '@emotion/react',
       '@emotion/styled',
       '@mui/material',
