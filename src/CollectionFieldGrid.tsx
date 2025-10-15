@@ -686,6 +686,7 @@ export default function CollectionFieldGrid({
                 ) : (
                   <Paper variant="outlined">
                     <DataGrid
+                      key={`collection-datagrid-${locale}`}
                       rows={rows}
                       columns={gridColumns}
                       pagination

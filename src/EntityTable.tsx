@@ -590,6 +590,7 @@ function EntityTable({
       {!loadingData && !errorData && (
         <Paper sx={{ width: "100%", p: 0, minWidth: 0 }}>
           <DataGrid
+            key={`datagrid-${locale}`}
             rows={gridRows}
             getRowId={(row: { __rid: string }) => row.__rid}
             columns={gridColumns}
