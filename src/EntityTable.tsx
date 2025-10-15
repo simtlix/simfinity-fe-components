@@ -546,18 +546,12 @@ function EntityTable({
       filterOperatorGreaterThanOrEqual: t('filter.greaterThanOrEqual', 'greater than or equal to'),
       filterOperatorLessThan: t('filter.lessThan', 'less than'),
       filterOperatorLessThanOrEqual: t('filter.lessThanOrEqual', 'less than or equal to'),
-      // Pagination
-      MuiTablePagination: {
-        labelRowsPerPage: t('pagination.rowsPerPage', 'Rows per page:'),
-        labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) =>
-          t('pagination.displayedRows', `${from}–${to} of ${count !== -1 ? count : `more than ${to}`}`),
-      },
       // Footer
       footerRowSelected: (count: number) =>
         count !== 1
           ? t('footer.rowsSelected', `${count.toLocaleString()} rows selected`)
           : t('footer.rowSelected', `${count.toLocaleString()} row selected`),
-    } as const;
+    };
   }, [resolveLabel, listField, locale]);
 
   return (
@@ -650,6 +644,13 @@ function EntityTable({
                   }}
                 />
               ),
+            }}
+            slotProps={{
+              pagination: {
+                labelRowsPerPage: resolveLabel(['grid.pagination.rowsPerPage'], { entity: listField }, 'Rows per page:'),
+                labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) =>
+                  resolveLabel(['grid.pagination.displayedRows'], { entity: listField }, `${from}–${to} of ${count !== -1 ? count : `more than ${to}`}`),
+              },
             }}
             disableRowSelectionOnClick
             sx={{ border: 0 }}

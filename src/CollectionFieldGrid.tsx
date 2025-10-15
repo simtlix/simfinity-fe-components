@@ -617,18 +617,12 @@ export default function CollectionFieldGrid({
   const localeText = React.useMemo(() => {
     const t = (k: string, d: string) => resolveLabel([`grid.${k}`], { entity: collectionField.objectTypeName }, d);
     return {
-      // Pagination
-      MuiTablePagination: {
-        labelRowsPerPage: t('pagination.rowsPerPage', 'Rows per page:'),
-        labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) =>
-          t('pagination.displayedRows', `${from}–${to} of ${count !== -1 ? count : `more than ${to}`}`),
-      },
       // Footer
       footerRowSelected: (count: number) =>
         count !== 1
           ? t('footer.rowsSelected', `${count.toLocaleString()} rows selected`)
           : t('footer.rowSelected', `${count.toLocaleString()} row selected`),
-    } as const;
+    };
   }, [resolveLabel, collectionField.objectTypeName, locale]);
 
   if (!collectionQuery) {
@@ -705,6 +699,13 @@ export default function CollectionFieldGrid({
                       }}
                       loading={collectionLoading}
                       localeText={localeText}
+                      slotProps={{
+                        pagination: {
+                          labelRowsPerPage: resolveLabel(['grid.pagination.rowsPerPage'], { entity: collectionField.objectTypeName }, 'Rows per page:'),
+                          labelDisplayedRows: ({ from, to, count }: { from: number; to: number; count: number }) =>
+                            resolveLabel(['grid.pagination.displayedRows'], { entity: collectionField.objectTypeName }, `${from}–${to} of ${count !== -1 ? count : `more than ${to}`}`),
+                        },
+                      }}
                       disableRowSelectionOnClick
                     />
                   </Paper>
