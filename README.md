@@ -27,7 +27,7 @@ npm install @simtlix/simfinity-fe-components
 This package requires the following peer dependencies:
 
 ```bash
-npm install @apollo/client @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid graphql react react-dom
+npm install urql graphql-tag @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid graphql react react-dom
 ```
 
 ## 🚀 Quick Start
@@ -35,14 +35,18 @@ npm install @apollo/client @emotion/react @emotion/styled @mui/material @mui/ico
 ### Basic Setup
 
 ```tsx
-import { ApolloProvider } from '@apollo/client';
+import { Provider as UrqlProvider, createClient } from 'urql';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { EntityForm, EntityTable, I18nProvider } from '@simtlix/simfinity-fe-components';
 
+const urqlClient = createClient({
+  url: 'http://localhost:3000/graphql',
+});
+
 function MyApp() {
   return (
-    <ApolloProvider client={apolloClient}>
+    <UrqlProvider value={urqlClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <I18nProvider>
@@ -50,7 +54,7 @@ function MyApp() {
           <EntityForm listField="series" action="create" />
         </I18nProvider>
       </ThemeProvider>
-    </ApolloProvider>
+    </UrqlProvider>
   );
 }
 ```
@@ -267,7 +271,7 @@ State machines allow you to manage entity state transitions with custom validati
 
 ```tsx
 import { registerEntityStateMachine } from '@simtlix/simfinity-fe-components';
-import { gql } from '@apollo/client';
+import { gql } from 'graphql-tag';
 
 // Register state machine for an entity type
 registerEntityStateMachine('season', {
@@ -601,34 +605,33 @@ type FieldCustomization = {
 1. **Install the package and dependencies:**
    ```bash
    npm install @simtlix/simfinity-fe-components
-   npm install @apollo/client @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid graphql react react-dom
+   npm install urql graphql-tag @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid graphql react react-dom
    ```
 
-2. **Set up your Apollo Client:**
+2. **Set up your URQL Client:**
    ```tsx
-   import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+   import { createClient } from 'urql';
    
-   const client = new ApolloClient({
-     link: createHttpLink({ uri: 'your-graphql-endpoint' }),
-     cache: new InMemoryCache()
+   const client = createClient({
+     url: 'your-graphql-endpoint',
    });
    ```
 
 3. **Wrap your app with providers:**
    ```tsx
-   import { ApolloProvider } from '@apollo/client';
+   import { Provider as UrqlProvider } from 'urql';
    import { ThemeProvider } from '@mui/material/styles';
    import { I18nProvider } from '@simtlix/simfinity-fe-components';
    
    function App() {
      return (
-       <ApolloProvider client={client}>
+       <UrqlProvider value={client}>
          <ThemeProvider theme={theme}>
            <I18nProvider>
              {/* Your app components */}
            </I18nProvider>
          </ThemeProvider>
-       </ApolloProvider>
+       </UrqlProvider>
      );
    }
    ```

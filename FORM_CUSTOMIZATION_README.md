@@ -960,7 +960,7 @@ State machines allow you to manage entity state transitions with custom validati
 
 ```tsx
 import { registerEntityStateMachine } from '@simtlix/simfinity-fe-components';
-import { gql } from '@apollo/client';
+import { gql } from 'graphql-tag';
 
 export function setupSeasonStateMachine() {
   registerEntityStateMachine('season', {

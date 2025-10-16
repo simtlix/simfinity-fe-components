@@ -39,32 +39,26 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 }
 ```
 
-**lib/apollo-provider.tsx**
+**lib/urql-provider.tsx**
 ```tsx
 'use client';
 
-import { ApolloProvider as ApolloClientProvider } from '@apollo/client';
-import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+import { Provider as UrqlProvider, createClient } from 'urql';
 import { ReactNode } from 'react';
 
-const httpLink = createHttpLink({
-  uri: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'https://your-graphql-endpoint.com/graphql',
+const client = createClient({
+  url: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'https://your-graphql-endpoint.com/graphql',
 });
 
-const client = new ApolloClient({
-  link: httpLink,
-  cache: new InMemoryCache(),
-});
-
-interface ApolloProviderProps {
+interface GraphQLProviderProps {
   children: ReactNode;
 }
 
-export function ApolloProvider({ children }: ApolloProviderProps) {
+export function GraphQLProvider({ children }: GraphQLProviderProps) {
   return (
-    <ApolloClientProvider client={client}>
+    <UrqlProvider value={client}>
       {children}
-    </ApolloClientProvider>
+    </UrqlProvider>
   );
 }
 ```
@@ -77,7 +71,7 @@ export function ApolloProvider({ children }: ApolloProviderProps) {
 
 import { ReactNode } from 'react';
 import { ThemeProvider } from '@/lib/theme-provider';
-import { ApolloProvider } from '@/lib/apollo-provider';
+import { GraphQLProvider } from '@/lib/urql-provider';
 
 interface SimfinityWrapperProps {
   children: ReactNode;
@@ -85,11 +79,11 @@ interface SimfinityWrapperProps {
 
 export function SimfinityWrapper({ children }: SimfinityWrapperProps) {
   return (
-    <ApolloProvider>
+    <GraphQLProvider>
       <ThemeProvider>
         {children}
       </ThemeProvider>
-    </ApolloProvider>
+    </GraphQLProvider>
   );
 }
 ```

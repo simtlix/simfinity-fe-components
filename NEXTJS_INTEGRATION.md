@@ -22,7 +22,7 @@ npm install ./simfinity-fe-components-1.0.0.tgz
 
 ### Step 3: Install Peer Dependencies
 ```bash
-npm install @apollo/client @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid graphql
+npm install urql graphql-tag @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid graphql
 ```
 
 ## 🔧 Method 2: Git Repository Installation
@@ -59,18 +59,13 @@ cd packages/simfinity-fe-components && npm install
 // components/SimfinityWrapper.tsx
 'use client';
 
-import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+import { Provider as UrqlProvider, createClient } from 'urql';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { EntityForm, EntityTable } from 'simfinity-fe-components';
 
-const httpLink = createHttpLink({
-  uri: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'https://your-graphql-endpoint.com/graphql',
-});
-
-const client = new ApolloClient({
-  link: httpLink,
-  cache: new InMemoryCache(),
+const client = createClient({
+  url: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'https://your-graphql-endpoint.com/graphql',
 });
 
 const theme = createTheme({
@@ -79,12 +74,12 @@ const theme = createTheme({
 
 export function SimfinityWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <ApolloProvider client={client}>
+    <UrqlProvider value={client}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         {children}
       </ThemeProvider>
-    </ApolloProvider>
+    </UrqlProvider>
   );
 }
 ```
@@ -125,18 +120,13 @@ export default function HomePage() {
 
 ## 🎯 Next.js Pages Router Setup
 
-### 1. Setup Apollo Client
+### 1. Setup URQL Client
 ```tsx
-// lib/apollo-client.ts
-import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+// lib/urql-client.ts
+import { createClient } from 'urql';
 
-const httpLink = createHttpLink({
-  uri: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'https://your-graphql-endpoint.com/graphql',
-});
-
-export const client = new ApolloClient({
-  link: httpLink,
-  cache: new InMemoryCache(),
+export const client = createClient({
+  url: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT || 'https://your-graphql-endpoint.com/graphql',
 });
 ```
 
@@ -153,16 +143,16 @@ export const theme = createTheme({
 ### 3. Use in Pages
 ```tsx
 // pages/index.tsx
-import { ApolloProvider } from '@apollo/client';
+import { Provider as UrqlProvider } from 'urql';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
-import { client } from '@/lib/apollo-client';
+import { client } from '@/lib/urql-client';
 import { theme } from '@/lib/theme';
 import { EntityForm, EntityTable } from 'simfinity-fe-components';
 
 export default function HomePage() {
   return (
-    <ApolloProvider client={client}>
+    <UrqlProvider value={client}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <div className="container mx-auto p-4">
@@ -180,7 +170,7 @@ export default function HomePage() {
           />
         </div>
       </ThemeProvider>
-    </ApolloProvider>
+    </UrqlProvider>
   );
 }
 ```
@@ -218,8 +208,8 @@ module.exports = nextConfig;
 ### Issue: Styling not working
 **Solution:** Make sure to wrap with MUI ThemeProvider and CssBaseline
 
-### Issue: Apollo Client errors
-**Solution:** Ensure ApolloProvider wraps your components
+### Issue: URQL Client errors
+**Solution:** Ensure UrqlProvider wraps your components
 
 ## 🚀 Development Workflow
 
