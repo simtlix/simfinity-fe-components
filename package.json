@@ -1,6 +1,6 @@
 {
   "name": "@simtlix/simfinity-fe-components",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "type": "module",
   "description": "Simfinity Frontend Components - A dynamic, schema-driven form management system built with GraphQL, URQL, and Material-UI",
   "main": "dist/index.js",
