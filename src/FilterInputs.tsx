@@ -1,8 +1,10 @@
 import * as React from "react";
 import { Autocomplete, Chip, TextField, Stack, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import type { GridFilterInputValueProps } from "@mui/x-data-grid";
+import { useI18n } from "./lib/i18n";
 
 export function TagsFilterInput(props: GridFilterInputValueProps) {
+  const { resolveLabel } = useI18n();
   const valueArray = Array.isArray(props.item.value) ? (props.item.value as unknown[]) : [];
   return (
     <Autocomplete
@@ -17,7 +19,7 @@ export function TagsFilterInput(props: GridFilterInputValueProps) {
         <TextField 
           {...params} 
           size="small" 
-          placeholder="Values"
+          placeholder={resolveLabel(['grid.filter.values'], { entity: '' }, 'Values')}
           slotProps={{
             input: {
               startAdornment: (valueArray as string[]).map((option: string, index: number) => (
@@ -41,6 +43,7 @@ export function TagsFilterInput(props: GridFilterInputValueProps) {
 }
 
 export function BetweenFilterInput(props: GridFilterInputValueProps & { inputType?: string }) {
+  const { resolveLabel } = useI18n();
   const arr = Array.isArray(props.item.value) ? (props.item.value as unknown[]) : [null, null];
   const [minVal, maxVal] = [arr[0] ?? "", arr[1] ?? ""] as (string | number)[];
   return (
@@ -50,7 +53,7 @@ export function BetweenFilterInput(props: GridFilterInputValueProps & { inputTyp
         type={props.inputType ?? "text"}
         value={minVal}
         onChange={(e) => props.applyValue({ ...props.item, value: [e.target.value, maxVal] })}
-        placeholder="Min"
+        placeholder={resolveLabel(['grid.filter.min'], { entity: '' }, 'Min')}
         fullWidth
       />
       <TextField
@@ -58,7 +61,7 @@ export function BetweenFilterInput(props: GridFilterInputValueProps & { inputTyp
         type={props.inputType ?? "text"}
         value={maxVal}
         onChange={(e) => props.applyValue({ ...props.item, value: [minVal, e.target.value] })}
-        placeholder="Max"
+        placeholder={resolveLabel(['grid.filter.max'], { entity: '' }, 'Max')}
         fullWidth
       />
     </Stack>
@@ -87,16 +90,17 @@ export function StateMachineFilterInput(props: GridFilterInputValueProps & {
 }) {
   const { entityTypeName, enumValues, resolveLabel } = props;
   const currentValue = props.item.value as string || "";
+  const stateLabel = resolveLabel(['grid.filter.state'], { entity: '' }, 'State');
 
   return (
     <FormControl fullWidth size="small">
-      <InputLabel>State</InputLabel>
+      <InputLabel>{stateLabel}</InputLabel>
       <Select
         value={currentValue}
         onChange={(e) => {
           props.applyValue({ ...props.item, value: e.target.value });
         }}
-        label="State"
+        label={stateLabel}
       >
         {enumValues.map((enumValue) => {
           const stateKey = `stateMachine.${entityTypeName.toLowerCase()}.state.${enumValue}`;

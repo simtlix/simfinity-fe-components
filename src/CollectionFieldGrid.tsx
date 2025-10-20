@@ -620,6 +620,16 @@ export default function CollectionFieldGrid({
   const localeText = React.useMemo(() => {
     const t = (k: string, d: string) => resolveLabel([`grid.${k}`], { entity: collectionField.objectTypeName }, d);
     return {
+      // Column menu
+      columnMenuSortAsc: t('columnMenu.sortAsc', 'Sort by ASC'),
+      columnMenuSortDesc: t('columnMenu.sortDesc', 'Sort by DESC'),
+      columnMenuFilter: t('columnMenu.filter', 'Filter'),
+      columnMenuHideColumn: t('columnMenu.hideColumn', 'Hide column'),
+      columnMenuManageColumns: t('columnMenu.manageColumns', 'Manage columns'),
+      columnMenuShowColumns: t('columnMenu.showColumns', 'Show columns'),
+      columnMenuUnsort: t('columnMenu.unsort', 'Unsort'),
+      // Input Label
+      filterPanelInputLabel: t('filterPanel.inputLabel', 'Value'),
       // Footer
       footerRowSelected: (count: number) =>
         count !== 1

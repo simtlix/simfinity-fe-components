@@ -461,9 +461,9 @@ function EntityTable({
             const keep = new Set(['=', '!=', '>', '>=', '<', '<=', 'equals']);
             return [
               ...base.filter((o) => (o.value ? keep.has(o.value) : false)),
-              { label: 'between', value: 'btw', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: BetweenFilterInput, InputComponentProps: { inputType: 'number' } } as unknown as GridFilterOperator,
-              { label: 'in', value: 'in', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
-              { label: 'not in', value: 'nin', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
+              { label: resolveLabel(['grid.filter.between'], { entity: listField }, 'between'), value: 'btw', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: BetweenFilterInput, InputComponentProps: { inputType: 'number' } } as unknown as GridFilterOperator,
+              { label: resolveLabel(['grid.filter.in'], { entity: listField }, 'in'), value: 'in', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
+              { label: resolveLabel(['grid.filter.notIn'], { entity: listField }, 'not in'), value: 'nin', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
             ];
           }
           if (isBoolean) {
@@ -478,16 +478,16 @@ function EntityTable({
               { label: '>=', value: '>=', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: DateFilterInput, InputComponentProps: { inputType: 'datetime-local' } } as unknown as GridFilterOperator,
               { label: '<', value: '<', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: DateFilterInput, InputComponentProps: { inputType: 'datetime-local' } } as unknown as GridFilterOperator,
               { label: '<=', value: '<=', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: DateFilterInput, InputComponentProps: { inputType: 'datetime-local' } } as unknown as GridFilterOperator,
-              { label: 'between', value: 'btw', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: BetweenFilterInput, InputComponentProps: { inputType: 'datetime-local' } } as unknown as GridFilterOperator,
+              { label: resolveLabel(['grid.filter.between'], { entity: listField }, 'between'), value: 'btw', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: BetweenFilterInput, InputComponentProps: { inputType: 'datetime-local' } } as unknown as GridFilterOperator,
             ];
           }
           // Strings: only contains, equals, not equal ("!="), in, nin; symbols for equals/!=
           return [
-            { label: 'contains', value: 'contains', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: GridFilterInputValue } as unknown as GridFilterOperator,
+            { label: resolveLabel(['grid.filter.contains'], { entity: listField }, 'contains'), value: 'contains', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: GridFilterInputValue } as unknown as GridFilterOperator,
             { label: '=', value: 'equals', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: GridFilterInputValue } as unknown as GridFilterOperator,
             { label: '!=', value: '!=', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: GridFilterInputValue } as unknown as GridFilterOperator,
-            { label: 'in', value: 'in', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
-            { label: 'not in', value: 'nin', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
+            { label: resolveLabel(['grid.filter.in'], { entity: listField }, 'in'), value: 'in', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
+            { label: resolveLabel(['grid.filter.notIn'], { entity: listField }, 'not in'), value: 'nin', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
           ];
         })(),
         valueGetter: isDate
@@ -532,7 +532,7 @@ function EntityTable({
     });
 
     return [actionColumn, ...dataColumns];
-  }, [resolvedColumns, resolveLabel, entityNameForLabels, valueResolvers, fieldTypeByColumn, listField, getFieldInfo, renderStateMachineValue]);
+  }, [resolvedColumns, resolveLabel, entityNameForLabels, valueResolvers, fieldTypeByColumn, listField, getFieldInfo, renderStateMachineValue, locale]);
 
   const gridRows: GridRow[] = React.useMemo(() => {
     return rows.map((row, idx) => ({ __rid: String((row as Record<string, unknown>)["id"] ?? `${listField}-${page}-${idx}`), ...row }));
@@ -579,6 +579,18 @@ function EntityTable({
       filterOperatorGreaterThanOrEqual: t('filter.greaterThanOrEqual', 'greater than or equal to'),
       filterOperatorLessThan: t('filter.lessThan', 'less than'),
       filterOperatorLessThanOrEqual: t('filter.lessThanOrEqual', 'less than or equal to'),
+      // Column menu
+      columnMenuSortAsc: t('columnMenu.sortAsc', 'Sort by ASC'),
+      columnMenuSortDesc: t('columnMenu.sortDesc', 'Sort by DESC'),
+      columnMenuFilter: t('columnMenu.filter', 'Filter'),
+      columnMenuHideColumn: t('columnMenu.hideColumn', 'Hide column'),
+      columnMenuManageColumns: t('columnMenu.manageColumns', 'Manage columns'),
+      columnMenuShowColumns: t('columnMenu.showColumns', 'Show columns'),
+      columnMenuUnsort: t('columnMenu.unsort', 'Unsort'),
+      // Input Label
+      filterPanelInputLabel: t('filterPanel.inputLabel', 'Value'),
+     
+
       // Footer
       footerRowSelected: (count: number) =>
         count !== 1

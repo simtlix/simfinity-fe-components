@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Stack, Button } from "@mui/material";
 import { GridFilterPanel, useGridApiContext, type GridFilterModel } from "@mui/x-data-grid";
+import { useI18n } from "./lib/i18n";
 
 type ServerFilterPanelProps = {
   onApply: (model: GridFilterModel) => void;
@@ -9,6 +10,7 @@ type ServerFilterPanelProps = {
 
 export default function ServerFilterPanel({ onApply, onClear }: ServerFilterPanelProps) {
   const apiRef = useGridApiContext();
+  const { resolveLabel } = useI18n();
   return (
     <Stack sx={{ p: 1 }} spacing={1}>
       <GridFilterPanel />
@@ -22,7 +24,7 @@ export default function ServerFilterPanel({ onApply, onClear }: ServerFilterPane
             apiRef.current.hideFilterPanel();
           }}
         >
-          Clear
+          {resolveLabel(['grid.filter.clear'], { entity: '' }, 'Clear')}
         </Button>
         <Button
           size="small"
@@ -35,7 +37,7 @@ export default function ServerFilterPanel({ onApply, onClear }: ServerFilterPane
             apiRef.current.hideFilterPanel();
           }}
         >
-          Apply
+          {resolveLabel(['grid.filter.apply'], { entity: '' }, 'Apply')}
         </Button>
       </Stack>
     </Stack>
