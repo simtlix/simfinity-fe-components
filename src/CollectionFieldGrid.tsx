@@ -532,7 +532,8 @@ export default function CollectionFieldGrid({
       const columnDef: GridColDef = {
         field: column,
         headerName: resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column),
-        width: 150,
+        flex: 1,
+        minWidth: 150,
         sortable: true,
         filterable: false, // Disable filtering for now to keep it simple
       };
@@ -572,9 +573,10 @@ export default function CollectionFieldGrid({
       baseColumns.push({
         field: 'actions',
         headerName: resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions"),
-        width: 120,
+        width: 100,
         sortable: false,
         filterable: false,
+        disableColumnMenu: true,
         renderCell: (params) => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title={resolveLabel(["collection.actions.edit"], { entity: collectionField.objectTypeName }, "Edit")}>
