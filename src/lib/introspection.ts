@@ -166,7 +166,7 @@ export function getListEntityFieldNames(schema: SchemaData): string[] {
   const queryType = getQueryType(schema);
   if (!queryType?.fields) return [];
   return queryType.fields
-    .filter((f) => isListType(f.type))
+    .filter((f) => isListType(f.type) && !f.name.endsWith('_aggregate'))
     .map((f) => f.name)
     .sort((a, b) => a.localeCompare(b));
 }
