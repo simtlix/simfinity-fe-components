@@ -249,6 +249,14 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
   const [stateMachineMenuAnchor, setStateMachineMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [stateMachineLoading, setStateMachineLoading] = React.useState<string | null>(null);
 
+  // Ref to track if initial entity data has been loaded (prevents resetting user changes)
+  const initialDataLoadedRef = React.useRef(false);
+
+  // Reset the initial data loaded ref when entityId changes (navigating to different entity)
+  React.useEffect(() => {
+    initialDataLoadedRef.current = false;
+  }, [entityId]);
+
   // Form customization state
   const [customizationState, setCustomizationState] = React.useState<FormCustomizationState>({
     customization: {},
@@ -679,7 +687,6 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
           formFields.forEach(field => {
             initialData[field.name] = field;
           });
-          console.log('Initializing form data with:', initialData);
           return initialData;
         }
         return prevData;
@@ -689,23 +696,18 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
 
   // Load existing entity data for edit/view
   React.useEffect(() => {
-    console.log('Data loading effect triggered:', { entityData, action, listField, formFields });
+    // Skip if initial data already loaded (prevents resetting user changes when navigating steps)
+    if (initialDataLoadedRef.current) {
+      return;
+    }
     
     if (entityData && action !== "create" && formFields.length > 0 && entityTypeName) {
-      const entityName = entityTypeName; // Use introspection result
-      console.log('Looking for entity with name:', entityName);
-      console.log('Available keys in entityData:', Object.keys(entityData));
-      
+      const entityName = entityTypeName;
       const entity = entityData[entityName];
-      console.log('Found entity:', entity);
       
       if (entity) {
-        console.log('Entity fields:', Object.keys(entity));
-        console.log('Form fields:', formFields.map(f => f.name));
-        
         const updatedData: FormData = {};
         formFields.forEach(field => {
-          console.log(`Checking field ${field.name}:`, entity[field.name]);
           if (entity[field.name] !== undefined) {
             let fieldValue = entity[field.name];
             
@@ -718,26 +720,20 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
               ...field,
               value: fieldValue,
             };
-            console.log(`Updated field ${field.name} with value:`, fieldValue);
             
             // Handle embedded object fields - populate their nested fields
             if (field.isEmbedded && field.embeddedFields && fieldValue && typeof fieldValue === 'object') {
-              console.log(`Processing embedded object ${field.name}:`, fieldValue);
               field.embeddedFields.forEach(embeddedField => {
                 const embeddedFieldName = embeddedField.name.replace(`${field.name}.`, '');
                 const embeddedFieldValue = fieldValue[embeddedFieldName];
-                
-                console.log(`Embedded field ${embeddedField.name}: extracted name = ${embeddedFieldName}, value = ${embeddedFieldValue}`);
                 
                 if (embeddedFieldValue !== undefined) {
                   updatedData[embeddedField.name] = {
                     ...embeddedField,
                     value: embeddedFieldValue,
                   };
-                  console.log(`Updated embedded field ${embeddedField.name} with value:`, embeddedFieldValue);
                 } else {
                   updatedData[embeddedField.name] = embeddedField;
-                  console.log(`Embedded field ${embeddedField.name} not found in data, using default`);
                 }
               });
             }
@@ -745,8 +741,10 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
             updatedData[field.name] = field;
           }
         });
-        console.log('Final updated data:', updatedData);
         setFormData(updatedData);
+        
+        // Mark as loaded after first successful load
+        initialDataLoadedRef.current = true;
       }
     }
   }, [entityData, entityTypeName, action, formFields, listField]);
