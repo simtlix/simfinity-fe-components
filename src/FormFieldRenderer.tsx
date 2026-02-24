@@ -109,6 +109,9 @@ export default function FormFieldRenderer({
   const isVisible = (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'visible' in fieldCustomization) ? (fieldCustomization as any).visible !== false : true;
   const isEnabled = (typeof fieldCustomization === 'object' && fieldCustomization !== null && 'enabled' in fieldCustomization) ? (fieldCustomization as any).enabled !== false : true;
   
+  // Check if field is marked as readOnly in schema extensions
+  const isReadOnly = field.extensions?.readOnly === true;
+  
   if (!isVisible) {
     return null;
   }
@@ -161,7 +164,7 @@ export default function FormFieldRenderer({
               }
             }
           }}
-          disabled={disabled || !isEnabled}
+          disabled={disabled || !isEnabled || isReadOnly}
         />
         {error && <FormHelperText error>{error}</FormHelperText>}
       </Box>
@@ -181,7 +184,7 @@ export default function FormFieldRenderer({
           required={isRequired}
           error={!!error}
           helperText={error}
-          disabled={disabled || !isEnabled}
+          disabled={disabled || !isEnabled || isReadOnly}
           fullWidth
           size="small"
           placeholder={resolveLabel(["form.selectField"], { entity: entityTypeName, field: field.name }, `Select ${field.name}`)}
@@ -219,7 +222,7 @@ export default function FormFieldRenderer({
                 });
               }}
               error={error}
-              disabled={disabled || !isEnabled}
+              disabled={disabled || !isEnabled || isReadOnly}
               schemaData={schemaData}
               entityTypeName={entityTypeName}
               customizationState={customizationState}
@@ -243,7 +246,7 @@ export default function FormFieldRenderer({
           <Checkbox
             checked={Boolean(value)}
             onChange={(e) => handleChange(e.target.checked)}
-            disabled={disabled || !isEnabled}
+            disabled={disabled || !isEnabled || isReadOnly}
           />
         }
         label={resolveLabel([`${entityTypeName}.${field.name}`], { entity: entityTypeName, field: field.name }, field.name)}
@@ -261,7 +264,7 @@ export default function FormFieldRenderer({
         required={isRequired}
         error={!!error}
         helperText={error}
-        disabled={disabled || !isEnabled}
+        disabled={disabled || !isEnabled || isReadOnly}
         fullWidth
         size="small"
       />
@@ -278,7 +281,7 @@ export default function FormFieldRenderer({
         required={isRequired}
         error={!!error}
         helperText={error}
-        disabled={disabled || !isEnabled}
+        disabled={disabled || !isEnabled || isReadOnly}
         fullWidth
         size="small"
         slotProps={{ inputLabel: { shrink: true } }}
@@ -291,7 +294,7 @@ export default function FormFieldRenderer({
     const enumValues = getEnumValues(schemaData, field.type);
     
     return (
-      <FormControl fullWidth size="small" error={!!error} disabled={disabled || !isEnabled}>
+      <FormControl fullWidth size="small" error={!!error} disabled={disabled || !isEnabled || isReadOnly}>
         <InputLabel>{resolveLabel([`${entityTypeName}.${field.name}`], { entity: entityTypeName, field: field.name }, field.name)}</InputLabel>
         <Select
           value={value || ''}
@@ -319,7 +322,7 @@ export default function FormFieldRenderer({
         required={isRequired}
         error={!!error}
         helperText={error}
-        disabled={disabled || !isEnabled}
+        disabled={disabled || !isEnabled || isReadOnly}
         fullWidth
         size="small"
       />

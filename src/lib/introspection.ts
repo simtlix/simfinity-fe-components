@@ -36,6 +36,7 @@ export const INTROSPECTION_QUERY = gql`
               connectionField
             }
             stateMachine
+            readOnly
           }
         }
         enumValues {
@@ -131,6 +132,7 @@ export type SchemaField = {
       connectionField?: string | null;
     } | null;
     stateMachine?: boolean | null;
+    readOnly?: boolean | null;
   } | null;
 };
 

@@ -84,6 +84,7 @@ type FormField = {
   collectionObjectTypeName?: string;
   connectionField?: string;
   isStateMachine?: boolean;
+  isReadOnly?: boolean;
 };
 
 type FormData = Record<string, FormField>;
@@ -262,6 +263,7 @@ export default function CollectionItemEditForm({
             collectionObjectTypeName: undefined,
             connectionField: undefined,
             isStateMachine: field.extensions?.stateMachine === true,
+            isReadOnly: field.extensions?.readOnly === true,
           };
         });
     } catch (error) {
@@ -496,9 +498,14 @@ export default function CollectionItemEditForm({
       console.log('Current formData:', formData);
       
       formFields.forEach(field => {
-        // Skip state machine fields from mutation data
+        // Skip state machine fields and read-only fields from mutation data
         if (field.isStateMachine) {
           console.log(`Skipping state machine field ${field.name} from mutation data`);
+          return;
+        }
+        
+        if (field.isReadOnly) {
+          console.log(`Skipping read-only field ${field.name} from mutation data`);
           return;
         }
         
@@ -633,6 +640,7 @@ export default function CollectionItemEditForm({
     const isVisible = isFieldVisible(field.name, customizationState, field.value, formData);
     const isEnabled = isFieldEnabled(field.name, customizationState, field.value, formData);
     const isStateMachineField = field.isStateMachine === true;
+    const isReadOnlyField = field.isReadOnly === true;
 
     if (!isVisible) return null;
 
@@ -661,7 +669,7 @@ export default function CollectionItemEditForm({
               console.log(`Custom renderer field ${fieldName} onChange:`, { value, type: typeof value });
               handleFieldChange(fieldName, value);
             },
-            !isEnabled || isStateMachineField,
+            !isEnabled || isStateMachineField || isReadOnlyField,
             formData
           )}
         </Grid>
@@ -680,7 +688,7 @@ export default function CollectionItemEditForm({
             }}
             error={formField.error}
             required={field.required}
-            disabled={!isEnabled || isStateMachineField}
+            disabled={!isEnabled || isStateMachineField || isReadOnlyField}
             objectTypeName={field.objectTypeName}
             descriptionField={field.descriptionField}
             descriptionFieldType={field.descriptionFieldType || "String"}
@@ -694,7 +702,7 @@ export default function CollectionItemEditForm({
     if (field.isEnum && field.enumValues) {
       return (
         <Grid key={field.name} size={fieldSize}>
-          <FormControl fullWidth error={!!formField.error} required={field.required} disabled={!isEnabled || isStateMachineField}>
+          <FormControl fullWidth error={!!formField.error} required={field.required} disabled={!isEnabled || isStateMachineField || isReadOnlyField}>
             <InputLabel>{fieldLabel}</InputLabel>
             <Select
               value={formField.value || ""}
@@ -732,7 +740,7 @@ export default function CollectionItemEditForm({
                     console.log(`Boolean field ${field.name} onChange:`, { value, type: typeof value });
                     handleFieldChange(field.name, value);
                   }}
-                  disabled={!isEnabled || isStateMachineField}
+                  disabled={!isEnabled || isStateMachineField || isReadOnlyField}
                 />
               }
               label={fieldLabel}
@@ -792,7 +800,7 @@ export default function CollectionItemEditForm({
             error={!!formField.error}
             helperText={formField.error}
             required={field.required}
-            disabled={!isEnabled || isStateMachineField}
+            disabled={!isEnabled || isStateMachineField || isReadOnlyField}
             InputLabelProps={{ shrink: true }}
           />
         </Grid>
@@ -822,7 +830,7 @@ export default function CollectionItemEditForm({
             error={!!formField.error}
             helperText={formField.error}
             required={field.required}
-            disabled={!isEnabled || isStateMachineField}
+            disabled={!isEnabled || isStateMachineField || isReadOnlyField}
           />
         </Grid>
       );
@@ -843,7 +851,7 @@ export default function CollectionItemEditForm({
           error={!!formField.error}
           helperText={formField.error}
           required={field.required}
-          disabled={!isEnabled || isStateMachineField}
+          disabled={!isEnabled || isStateMachineField || isReadOnlyField}
         />
       </Grid>
     );

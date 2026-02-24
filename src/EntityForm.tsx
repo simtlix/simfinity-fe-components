@@ -109,6 +109,7 @@ type FormField = {
   collectionObjectTypeName?: string; // The type name of objects in the collection
   connectionField?: string; // The field name used to connect to the parent entity
   isStateMachine?: boolean; // Whether this field is managed by state machine mutations
+  isReadOnly?: boolean; // Whether this field is read-only (cannot be modified)
 };
 
 type FormData = Record<string, FormField>;
@@ -209,6 +210,7 @@ function processEmbeddedObjectFields(schema: SchemaData, objectTypeName: string,
             isEnum,
             enumValues,
             isObject: false, // Embedded fields are not objects themselves
+            isReadOnly: field.extensions?.readOnly === true,
             required: isRequired,
             value: getDefaultValue(typeName, isBoolean, isList, false),
             error: undefined,
@@ -537,6 +539,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
             collectionObjectTypeName,
             connectionField,
             isStateMachine: field.extensions?.stateMachine === true || (listField === "seasons" && field.name === "state"),
+            isReadOnly: field.extensions?.readOnly === true,
             required: isObject ? isObjectRequired : isRequired,
             value: getDefaultValue(typeName || "String", isBoolean, isList, isObject),
             error: undefined,
@@ -1153,12 +1156,18 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
         return; // Skip transient fields
       }
       
-      if (!field.isCollection && !field.isStateMachine) { // Skip collection fields and state machine fields
+      if (!field.isCollection && !field.isStateMachine && !field.isReadOnly) { // Skip collection fields, state machine fields, and read-only fields
         if (field.isEmbedded) {
           // Handle embedded object fields (like director in the example)
           const embeddedData: Record<string, unknown> = {};
           if (field.embeddedFields) {
             field.embeddedFields.forEach(embeddedField => {
+              // Skip read-only embedded fields from mutation data
+              if (embeddedField.isReadOnly) {
+                console.log(`Skipping read-only embedded field ${embeddedField.name} from mutation data`);
+                return;
+              }
+              
               const embeddedFieldName = embeddedField.name.replace(`${field.name}.`, '');
               let embeddedFieldValue = formData[embeddedField.name]?.value;
               
@@ -1536,7 +1545,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                   type: embeddedField.type,
                   isNonNull: embeddedField.required,
                   isList: embeddedField.isList,
-                  extensions: { embedded: true }
+                  extensions: { embedded: true, readOnly: embeddedField.isReadOnly }
                 };
                 
                 return (
@@ -1584,6 +1593,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
     const fieldLabel = getFieldLabel(field.name);
     const isViewMode = action === "view";
     const isStateMachineField = field.isStateMachine === true;
+    const isReadOnlyField = field.isReadOnly === true;
     
 
     
@@ -1599,7 +1609,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
         formActions,
         (fieldName: string, value: string | number | boolean | string[] | null | { id: string; [key: string]: unknown }) => 
           handleFieldChange(fieldName, value),
-        isViewMode || !enabled || isStateMachineField,
+        isViewMode || !enabled || isStateMachineField || isReadOnlyField,
         formData
       );
     }
@@ -1622,7 +1632,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
             onChange={onChange}
             error={field.error}
             required={field.required}
-            disabled={isViewMode || !enabled || isStateMachineField}
+            disabled={isViewMode || !enabled || isStateMachineField || isReadOnlyField}
             objectTypeName={field.objectTypeName}
             descriptionField={field.descriptionField}
             descriptionFieldType={field.descriptionFieldType}
@@ -1643,7 +1653,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
               onChange={(e) => onChange(e.target.value)}
               label={fieldLabel}
               required={field.required}
-              disabled={isViewMode || !enabled || isStateMachineField}
+              disabled={isViewMode || !enabled || isStateMachineField || isReadOnlyField}
             >
               {field.enumValues.map((enumValue) => (
                 <MenuItem key={enumValue} value={enumValue}>
@@ -1668,7 +1678,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
             options={[]}
             value={field.value as string[]}
             onChange={(_, newValue) => onChange(newValue)}
-            disabled={isViewMode || !enabled || isStateMachineField}
+            disabled={isViewMode || !enabled || isStateMachineField || isReadOnlyField}
             slotProps={{
               chip: {
                 variant: "outlined"
@@ -1697,7 +1707,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
                 type="checkbox"
                 checked={field.value as boolean}
                 onChange={(e) => onChange(e.target.checked)}
-                disabled={isViewMode || !enabled || isStateMachineField}
+                disabled={isViewMode || !enabled || isStateMachineField || isReadOnlyField}
               />
             }
             label={fieldLabel}
@@ -1733,7 +1743,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
             error={!!field.error}
             helperText={field.error}
             required={field.required}
-            disabled={isViewMode || !enabled || isStateMachineField}
+            disabled={isViewMode || !enabled || isStateMachineField || isReadOnlyField}
             slotProps={{ inputLabel: { shrink: true } }}
           />
         </>
@@ -1751,7 +1761,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
           error={!!field.error}
           helperText={field.error}
           required={field.required}
-          disabled={isViewMode || !enabled || isStateMachineField}
+          disabled={isViewMode || !enabled || isStateMachineField || isReadOnlyField}
         />
       </>
     );

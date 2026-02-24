@@ -110,6 +110,7 @@ export type FormField = {
   isCollection?: boolean;
   collectionObjectTypeName?: string;
   connectionField?: string;
+  isReadOnly?: boolean;
 };
 
 export type FieldCustomization = {
