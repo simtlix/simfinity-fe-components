@@ -1,25 +1,25 @@
 # @simtlix/simfinity-fe-components
 
-A comprehensive React component library for building dynamic, schema-driven entity management interfaces. Built with GraphQL, Apollo Client, and Material-UI v7.3.1, this package provides powerful components that automatically generate forms and tables from GraphQL schema introspection.
+A comprehensive React component library for building dynamic, schema-driven entity management interfaces. Built with `@simtlix/simfinity-js-client` and Material-UI, this package provides powerful components that automatically generate forms and tables from GraphQL schema introspection.
 
-## ✨ Features
+## Features
 
-- **🔧 Dynamic Form Generation**: Automatically generates forms from GraphQL schema introspection
-- **📊 Advanced Data Tables**: Server-side pagination, sorting, filtering with Material-UI DataGrid
-- **🏗️ Entity Management**: Create, edit, view, and manage any entity type
-- **📝 Stepper Mode**: Multi-step forms with customizable steps and navigation
-- **🔗 Complex Relationships**: Handles nested objects, collections, and foreign key relationships
-- **🎨 Extensive Customization**: Field-level customization with visibility, validation, and layout control
-- **🌍 Internationalization**: Built-in i18n support with multi-language capabilities
-- **🎯 State Machine Integration**: Built-in support for entity state machines
-- **📱 Responsive Design**: Beautiful, responsive UI components with Material-UI
-- **🔧 TypeScript Support**: Full TypeScript support with comprehensive type definitions
-- **🔄 Collection Management**: Advanced collection field handling with add/edit/delete operations
+- **Dynamic Form Generation**: Automatically generates forms from GraphQL schema introspection
+- **Advanced Data Tables**: Server-side pagination, sorting, filtering with Material-UI DataGrid
+- **Entity Management**: Create, edit, view, and manage any entity type
+- **Stepper Mode**: Multi-step forms with customizable steps and navigation
+- **Complex Relationships**: Handles nested objects, collections, and foreign key relationships
+- **Extensive Customization**: Field-level customization with visibility, validation, and layout control
+- **Internationalization**: Built-in i18n support with multi-language capabilities
+- **State Machine Integration**: Built-in support for entity state machines
+- **Responsive Design**: Beautiful, responsive UI components with Material-UI
+- **TypeScript Support**: Full TypeScript support with comprehensive type definitions
+- **Collection Management**: Advanced collection field handling with add/edit/delete operations
 
 ## Installation
 
 ```bash
-npm install @simtlix/simfinity-fe-components
+npm install @simtlix/simfinity-fe-components @simtlix/simfinity-js-client
 ```
 
 ## Peer Dependencies
@@ -27,26 +27,26 @@ npm install @simtlix/simfinity-fe-components
 This package requires the following peer dependencies:
 
 ```bash
-npm install urql graphql-tag @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid graphql react react-dom
+npm install @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid react react-dom
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Basic Setup
 
 ```tsx
-import { Provider as UrqlProvider, createClient } from 'urql';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
-import { EntityForm, EntityTable, I18nProvider } from '@simtlix/simfinity-fe-components';
-
-const urqlClient = createClient({
-  url: 'http://localhost:3000/graphql',
-});
+import {
+  SimfinityClientProvider,
+  I18nProvider,
+  EntityForm,
+  EntityTable
+} from '@simtlix/simfinity-fe-components';
 
 function MyApp() {
   return (
-    <UrqlProvider value={urqlClient}>
+    <SimfinityClientProvider endpoint="http://localhost:3000/graphql">
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <I18nProvider>
@@ -54,10 +54,12 @@ function MyApp() {
           <EntityForm listField="series" action="create" />
         </I18nProvider>
       </ThemeProvider>
-    </UrqlProvider>
+    </SimfinityClientProvider>
   );
 }
 ```
+
+`SimfinityClientProvider` initializes the `SimfinityClient`, performs a single introspection query against the Simfinity backend, and makes the client available to all child components via React context.
 
 ### Next.js Integration
 
@@ -97,16 +99,17 @@ export default function MyPage() {
 }
 ```
 
-## 🧩 Core Components
+## Core Components
 
 ### EntityTable
+
 A powerful data grid component with server-side pagination, sorting, and filtering.
 
 ```tsx
 <EntityTable
-  listField="series" // GraphQL list field name
-  onNavigate={(path) => router.push(path)} // Optional: custom navigation
-  getSearchParams={() => searchParams} // Optional: custom URL params
+  listField="series"                              // GraphQL list field name
+  onNavigate={(path) => router.push(path)}        // Optional: custom navigation
+  getSearchParams={() => searchParams}            // Optional: custom URL params
   onSearchParamsChange={(params) => updateURL(params)} // Optional: custom URL updates
 />
 ```
@@ -120,14 +123,15 @@ A powerful data grid component with server-side pagination, sorting, and filteri
 - Responsive design
 
 ### EntityForm
+
 Automatically generates forms from GraphQL schema with full CRUD operations.
 
 ```tsx
 <EntityForm
-  listField="series" // GraphQL list field name
-  action="create" // "create" | "edit" | "view"
-  entityId="123" // Required for edit/view modes
-  onNavigate={(path) => router.push(path)} // Optional: custom navigation
+  listField="series"                         // GraphQL list field name
+  action="create"                            // "create" | "edit" | "view"
+  entityId="123"                             // Required for edit/view modes
+  onNavigate={(path) => router.push(path)}   // Optional: custom navigation
 />
 ```
 
@@ -140,6 +144,7 @@ Automatically generates forms from GraphQL schema with full CRUD operations.
 - Breadcrumb navigation
 
 ### CollectionFieldGrid
+
 Advanced collection field management with inline editing.
 
 ```tsx
@@ -160,17 +165,17 @@ Advanced collection field management with inline editing.
 - Responsive grid layout
 
 ### FormFieldRenderer
-Generic component for rendering any form field type.
+
+Generic component for rendering any form field type. Uses the `SimfinityClient` internally via `useSimfinityClient()` for schema metadata.
 
 ```tsx
 <FormFieldRenderer
-  field={field} // Field definition from schema
-  value={value} // Current field value
-  onChange={handleChange} // Change handler
-  error={error} // Validation error
-  schemaData={schemaData} // GraphQL schema
-  entityTypeName="Series" // Entity type name
-  customizationState={customizationState} // Optional customization
+  field={field}                                  // Field definition from schema
+  value={value}                                  // Current field value
+  onChange={handleChange}                         // Change handler
+  error={error}                                  // Validation error
+  entityTypeName="Series"                        // Entity type name
+  customizationState={customizationState}        // Optional customization
 />
 ```
 
@@ -183,191 +188,225 @@ Generic component for rendering any form field type.
 - List fields (collections)
 - State machine fields
 
-## 🎨 Form Customization
+## React Hooks
+
+The library provides data-fetching hooks that wrap the `SimfinityClient` imperative API in reactive React hooks:
+
+### useSimfinityClient
+
+Access the `SimfinityClient` instance from context.
+
+```tsx
+import { useSimfinityClient } from '@simtlix/simfinity-fe-components';
+
+function MyComponent() {
+  const client = useSimfinityClient();
+  const typeName = client.getTypeNameForQuery('series'); // "Serie"
+  const fields = client.getFieldsOfType('Serie');
+}
+```
+
+### useFind
+
+Paginated list queries with filter and sort support. Re-fetches when page, size, sort, or filter options change.
+
+```tsx
+import { useFind } from '@simtlix/simfinity-fe-components';
+
+const { data, loading, error, totalCount, refetch } = useFind('Serie', {
+  page: 0,
+  size: 10,
+  sort: [{ field: 'name', order: 'ASC' }],
+  filters: [{ field: 'name', operator: 'LIKE', value: 'Breaking' }],
+});
+```
+
+### useEntityById
+
+Fetch a single entity by ID. Pauses automatically when `id` is falsy.
+
+```tsx
+import { useEntityById } from '@simtlix/simfinity-fe-components';
+
+const { data, loading, error, refetch } = useEntityById('Serie', entityId, 'id name description');
+```
+
+### useFindByParent
+
+Fetch collection items filtered by a parent entity. Supports excluding IDs (for modified/deleted items during editing).
+
+```tsx
+import { useFindByParent } from '@simtlix/simfinity-fe-components';
+
+const { data, loading, error, totalCount, refetch } = useFindByParent(
+  'Episode',
+  'season',       // connection field
+  seasonId,       // parent entity ID
+  { page: 0, size: 10, excludeIds: ['id1', 'id2'] }
+);
+```
+
+### useSearch
+
+FK search-as-you-type queries. Pauses when the search term is too short.
+
+```tsx
+import { useSearch } from '@simtlix/simfinity-fe-components';
+
+const { data, loading, error } = useSearch('Director', searchTerm, {
+  displayField: 'name',
+  page: 1,
+  size: 10,
+  pause: searchTerm.length < 1,
+});
+```
+
+## Form Customization
 
 The package provides extensive customization capabilities through the `FormCustomization` system:
 
 ### Basic Field Customization
 
 ```tsx
-import { FormCustomization } from '@simtlix/simfinity-fe-components';
+import { registerFormCustomization } from '@simtlix/simfinity-fe-components';
 
-const formCustomization: FormCustomization = {
-  fields: {
+registerFormCustomization('Episode', 'edit', {
+  fieldsCustomization: {
     name: {
-      visible: true,
-      enabled: true,
       size: { xs: 12, md: 6 },
-      onChange: (fieldName, value, formData, actions) => {
-        // Custom field change logic
-        if (fieldName === 'name' && value === 'test') {
-          actions.setFieldVisible('description', false);
-        }
-        return { success: true };
-      }
+      order: 1,
     },
     description: {
-      visible: true,
-      enabled: true,
-      size: { xs: 12, md: 6 }
-    }
-  }
-};
+      visible: (field, value, formData) => !!formData.name,
+      order: 2,
+    },
+    genre: {
+      onChange: (field, value, formData, setFieldData) => {
+        return { value };
+      },
+    },
+  },
+});
 ```
 
 ### Collection Field Customization
 
 ```tsx
-const collectionCustomization: FormCustomization = {
-  collectionFields: {
-    episodes: {
-      visible: true,
-      enabled: true,
-      size: { xs: 12 },
-      onAdd: (fieldName, newItem, actions) => {
-        // Custom add logic
-        return { success: true };
+registerFormCustomization('Serie', 'edit', {
+  fieldsCustomization: {
+    seasons: {
+      onDelete: async (item, setMessage) => {
+        return true; // confirm deletion
       },
-      onEdit: (fieldName, item, actions) => {
-        // Custom edit logic
-        return { success: true };
+      onEdit: {
+        fieldsCustomization: { number: { enabled: false } },
+        onSubmit: async (item, setFieldData, formData) => true,
       },
-      onDelete: (fieldName, item, actions) => {
-        // Custom delete logic
-        return { success: true };
-      }
-    }
-  }
-};
+      onCreate: {
+        fieldsCustomization: { number: { order: 1 } },
+      },
+    },
+  },
+});
 ```
 
 ### Entity-Level Callbacks
 
 ```tsx
-const entityCallbacks: EntityFormCallbacks = {
+registerFormCustomization('Serie', 'create', {
   beforeSubmit: async (formData, collectionChanges, transformedData, actions) => {
-    // Validate before submission
     if (!formData.name) {
       actions.setError('Name is required');
       return false;
     }
     return true;
   },
-  onSuccess: (result, actions) => {
+  onSuccess: (result, formData, collectionChanges, transformedData, actions) => {
     return {
       message: 'Entity created successfully!',
-      navigateTo: '/entities/series'
+      navigateTo: '/entities/series',
     };
   },
-  onError: (error, formData, actions) => {
+  onError: (error, formData, collectionChanges, transformedData, actions) => {
     actions.setError('An error occurred while saving');
-  }
-};
+  },
+});
 ```
 
-### State Machine Integration
+### Stepper Mode
+
+```tsx
+registerFormCustomization('Order', 'create', {
+  mode: 'stepper',
+  steps: [
+    {
+      stepId: 'basics',
+      stepLabel: 'form.step.basics',
+      onNext: async (formData, collections, transformed, actions) => {
+        return true; // validate before moving to next step
+      },
+    },
+    { stepId: 'details', stepLabel: 'form.step.details' },
+    {
+      stepId: 'confirm',
+      stepLabel: 'form.step.confirm',
+      customStepRenderer: (actions, handleFieldChange, handleEmbedded, disabled, formData) => (
+        <ConfirmPage />
+      ),
+    },
+  ],
+  fieldsCustomization: {
+    name: { stepId: 'basics', order: 1 },
+    category: { stepId: 'basics', order: 2 },
+    description: { stepId: 'details', order: 1 },
+  },
+});
+```
+
+## State Machine Integration
 
 State machines allow you to manage entity state transitions with custom validation and business logic.
 
 ```tsx
 import { registerEntityStateMachine } from '@simtlix/simfinity-fe-components';
-import { gql } from 'graphql-tag';
 
-// Register state machine for an entity type
 registerEntityStateMachine('season', {
   actions: {
-    // Activate action: SCHEDULED → ACTIVE
     activate: {
       mutation: 'activate_season',
       from: 'SCHEDULED',
       to: 'ACTIVE',
       onBeforeSubmit: async (formData, collectionChanges, transformedData, actions) => {
-        // Validate business rules before transition
         const episodesChanges = collectionChanges.episodes || { added: [], modified: [], deleted: [] };
-        const newEpisodesCount = episodesChanges.added.length;
-        
-        if (newEpisodesCount === 0) {
+        if (episodesChanges.added.length === 0) {
           actions.setFormMessage({
             type: 'error',
-            message: 'Cannot activate season without episodes'
+            message: 'Cannot activate season without episodes',
           });
           return { shouldProceed: false, error: 'Season must have at least one episode' };
         }
-        
         return { shouldProceed: true };
       },
       onSuccess: async (result, formData, collectionChanges, transformedData, actions) => {
-        actions.setFormMessage({
-          type: 'success',
-          message: 'Season activated successfully!'
-        });
+        actions.setFormMessage({ type: 'success', message: 'Season activated successfully!' });
       },
       onError: async (error, formData, collectionChanges, transformedData, actions) => {
-        actions.setFormMessage({
-          type: 'error',
-          message: `Failed to activate season: ${error.message}`
-        });
-      }
+        actions.setFormMessage({ type: 'error', message: `Failed to activate: ${error.message}` });
+      },
     },
-    
-    // Finalize action: ACTIVE → FINISHED
     finalize: {
       mutation: 'finalize_season',
       from: 'ACTIVE',
       to: 'FINISHED',
-      onBeforeSubmit: async (formData, collectionChanges, transformedData, actions) => {
-        // Query server for validation
-        const GET_EPISODES = gql`
-          query GetEpisodes($seasonId: QLValue!) {
-            episodes(season: { terms: { path: "id", operator: EQ, value: $seasonId } }) {
-              id
-              date
-            }
-          }
-        `;
-        
-        const { data } = await apolloClient.query({
-          query: GET_EPISODES,
-          variables: { seasonId: transformedData.id },
-          fetchPolicy: 'network-only'
-        });
-        
-        const existingEpisodes = data?.episodes || [];
-        const incompleteEpisodes = existingEpisodes.filter(ep => 
-          !ep.date || new Date(ep.date) > new Date()
-        );
-        
-        if (incompleteEpisodes.length > 0) {
-          actions.setFormMessage({
-            type: 'error',
-            message: 'Cannot finalize season with incomplete episodes'
-          });
-          return { shouldProceed: false, error: 'All episodes must be completed' };
-        }
-        
-        return { shouldProceed: true };
-      },
-      onSuccess: async (result, formData, collectionChanges, transformedData, actions) => {
-        actions.setFormMessage({
-          type: 'success',
-          message: 'Season finalized successfully!'
-        });
-      },
-      onError: async (error, formData, collectionChanges, transformedData, actions) => {
-        actions.setFormMessage({
-          type: 'error',
-          message: `Failed to finalize season: ${error.message}`
-        });
-      }
-    }
-  }
+    },
+  },
 });
 ```
 
 **State Machine Configuration:**
 
 - `actions`: Object containing all available state transitions
-- `mutation`: GraphQL mutation name for the transition
+- `mutation`: The mutation name registered in the Simfinity backend for the transition
 - `from`: Source state
 - `to`: Destination state
 - `onBeforeSubmit`: Validation callback before transition (return `{ shouldProceed: true/false }`)
@@ -396,7 +435,7 @@ The EntityForm automatically:
 }
 ```
 
-## 🌍 Internationalization
+## Internationalization
 
 Built-in i18n support with multiple configuration options:
 
@@ -407,9 +446,11 @@ import { I18nProvider } from '@simtlix/simfinity-fe-components';
 
 function App() {
   return (
-    <I18nProvider>
-      <EntityForm listField="series" action="create" />
-    </I18nProvider>
+    <SimfinityClientProvider endpoint="http://localhost:3000/graphql">
+      <I18nProvider>
+        <EntityForm listField="series" action="create" />
+      </I18nProvider>
+    </SimfinityClientProvider>
   );
 }
 ```
@@ -417,7 +458,6 @@ function App() {
 ### Custom Labels
 
 ```tsx
-// Register function-based labels
 import { registerFunctionLabels } from '@simtlix/simfinity-fe-components';
 
 registerFunctionLabels('en', {
@@ -428,10 +468,13 @@ registerFunctionLabels('en', {
   'form.edit': ({ entity }) => `Edit ${entity}`,
   'actions.view': ({ entity }) => `View ${entity}`,
   'actions.edit': ({ entity }) => `Edit ${entity}`,
-  'actions.delete': ({ entity }) => `Delete ${entity}`
+  'actions.delete': ({ entity }) => `Delete ${entity}`,
 });
+```
 
-// Or use JSON labels in public/i18n/en.json
+Or use JSON labels in `public/i18n/en.json`:
+
+```json
 {
   "entity.series.single": "Series",
   "entity.series.plural": "Series",
@@ -449,7 +492,6 @@ registerFunctionLabels('en', {
 ```tsx
 import { registerColumnRenderer } from '@simtlix/simfinity-fe-components';
 
-// Register custom column renderers
 registerColumnRenderer('series.name', ({ value, row }) => (
   <Typography variant="h6" color="primary">
     {value}
@@ -462,50 +504,26 @@ registerColumnRenderer('series.status', ({ value, entity }) => {
 });
 ```
 
-## 🔧 TypeScript Support
+## TypeScript Support
 
 Full TypeScript support with comprehensive type definitions:
 
 ```tsx
-import type { 
-  EntityFormProps,
-  EntityTableProps,
+import type {
   FormCustomization,
   FormField,
   CollectionFieldState,
   EntityFormCallbacks,
   FormMessage,
   FieldSize,
-  MessageType
+  MessageType,
+  FormCustomizationState,
+  FormCustomizationActions,
+  ParentFormAccess,
 } from '@simtlix/simfinity-fe-components';
-
-// Component props with full type safety
-const MyForm: React.FC<EntityFormProps> = (props) => {
-  // TypeScript provides full intellisense and type checking
-  return <EntityForm {...props} />;
-};
-
-// Customization types
-const customization: FormCustomization = {
-  fields: {
-    name: {
-      visible: true,
-      enabled: true,
-      size: { xs: 12, md: 6 } as FieldSize
-    }
-  }
-};
-
-// Callback types
-const callbacks: EntityFormCallbacks = {
-  beforeSubmit: async (formData, collectionChanges, transformedData, actions) => {
-    // Full type safety for all parameters
-    return true;
-  }
-};
 ```
 
-## 🛠️ Advanced Features
+## Advanced Features
 
 ### Collection State Management
 
@@ -518,7 +536,7 @@ function MyComponent() {
     updateCollectionState,
     getCollectionState,
     resetCollectionState,
-    getCollectionChanges
+    getCollectionChanges,
   } = useCollectionState();
 
   const handleCollectionChange = (fieldName: string, newState: CollectionFieldState) => {
@@ -539,10 +557,15 @@ function MyComponent() {
 ### Custom Filter Components
 
 ```tsx
-import { TagsFilterInput, BetweenFilterInput, DateFilterInput, StateMachineFilterInput } from '@simtlix/simfinity-fe-components';
+import {
+  TagsFilterInput,
+  BetweenFilterInput,
+  DateFilterInput,
+  StateMachineFilterInput,
+} from '@simtlix/simfinity-fe-components';
 
-// Custom filter inputs are automatically used by EntityTable
-// No additional configuration needed - they're integrated into the filtering system
+// Custom filter inputs are automatically used by EntityTable.
+// No additional configuration needed -- they are integrated into the filtering system.
 ```
 
 ### Server-Side Operations
@@ -563,104 +586,132 @@ import { TagsFilterInput, BetweenFilterInput, DateFilterInput, StateMachineFilte
 />
 ```
 
-## 📚 API Reference
+## API Reference
 
 ### EntityTable Props
 
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
-| `listField` | `string` | ✅ | GraphQL list field name (e.g., "series") |
-| `onNavigate` | `(path: string) => void` | ❌ | Custom navigation function |
-| `getSearchParams` | `() => URLSearchParams` | ❌ | Custom URL params getter |
-| `onSearchParamsChange` | `(params: URLSearchParams) => void` | ❌ | Custom URL params updater |
+| `listField` | `string` | Yes | GraphQL list field name (e.g., "series") |
+| `onNavigate` | `(path: string) => void` | No | Custom navigation function |
+| `getSearchParams` | `() => URLSearchParams` | No | Custom URL params getter |
+| `onSearchParamsChange` | `(params: URLSearchParams) => void` | No | Custom URL params updater |
 
 ### EntityForm Props
 
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
-| `listField` | `string` | ✅ | GraphQL list field name |
-| `action` | `"create" \| "edit" \| "view"` | ✅ | Form action mode |
-| `entityId` | `string` | ❌ | Required for edit/view modes |
-| `onNavigate` | `(path: string) => void` | ❌ | Custom navigation function |
+| `listField` | `string` | Yes | GraphQL list field name |
+| `action` | `"create" \| "edit" \| "view"` | Yes | Form action mode |
+| `entityId` | `string` | No | Required for edit/view modes |
+| `onNavigate` | `(path: string) => void` | No | Custom navigation function |
 
-### FormCustomization Types
+### SimfinityClientProvider Props
 
-```tsx
-type FormCustomization = {
-  fields?: Record<string, FieldCustomization>;
-  collectionFields?: Record<string, CollectionFieldCustomization>;
-  embeddedSections?: Record<string, EmbeddedSectionCustomization>;
-};
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `endpoint` | `string` | Yes | Simfinity GraphQL endpoint URL |
+| `children` | `React.ReactNode` | Yes | Child components |
 
-type FieldCustomization = {
-  visible?: boolean;
-  enabled?: boolean;
-  size?: FieldSize;
-  onChange?: (fieldName: string, value: unknown, formData: Record<string, unknown>, actions: EntityFormCallbackActions) => { success: boolean } | void;
-};
-```
-
-## 🚀 Getting Started Guide
+## Getting Started Guide
 
 1. **Install the package and dependencies:**
-   ```bash
-   npm install @simtlix/simfinity-fe-components
-   npm install urql graphql-tag @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid graphql react react-dom
-   ```
 
-2. **Set up your URQL Client:**
-   ```tsx
-   import { createClient } from 'urql';
-   
-   const client = createClient({
-     url: 'your-graphql-endpoint',
-   });
-   ```
+```bash
+npm install @simtlix/simfinity-fe-components @simtlix/simfinity-js-client
+npm install @emotion/react @emotion/styled @mui/material @mui/icons-material @mui/system @mui/x-data-grid react react-dom
+```
 
-3. **Wrap your app with providers:**
-   ```tsx
-   import { Provider as UrqlProvider } from 'urql';
-   import { ThemeProvider } from '@mui/material/styles';
-   import { I18nProvider } from '@simtlix/simfinity-fe-components';
-   
-   function App() {
-     return (
-       <UrqlProvider value={client}>
-         <ThemeProvider theme={theme}>
-           <I18nProvider>
-             {/* Your app components */}
-           </I18nProvider>
-         </ThemeProvider>
-       </UrqlProvider>
-     );
-   }
-   ```
+2. **Wrap your app with providers:**
 
-4. **Start using components:**
-   ```tsx
-   import { EntityTable, EntityForm } from '@simtlix/simfinity-fe-components';
-   
-   // Your components will automatically generate from your GraphQL schema
-   ```
+```tsx
+import { SimfinityClientProvider, I18nProvider } from '@simtlix/simfinity-fe-components';
+import { ThemeProvider } from '@mui/material/styles';
 
-## 📖 Additional Resources
+function App() {
+  return (
+    <SimfinityClientProvider endpoint="http://localhost:3000/graphql">
+      <ThemeProvider theme={theme}>
+        <I18nProvider>
+          {/* Your app components */}
+        </I18nProvider>
+      </ThemeProvider>
+    </SimfinityClientProvider>
+  );
+}
+```
+
+3. **Start using components:**
+
+```tsx
+import { EntityTable, EntityForm } from '@simtlix/simfinity-fe-components';
+
+// Components automatically generate from your GraphQL schema
+```
+
+## Migration from URQL
+
+If you are upgrading from a version that used URQL:
+
+1. **Remove URQL dependencies:**
+
+```bash
+npm uninstall urql graphql-tag graphql
+```
+
+2. **Replace the URQL provider** with `SimfinityClientProvider`:
+
+```diff
+- import { Provider as UrqlProvider, createClient } from 'urql';
++ import { SimfinityClientProvider } from '@simtlix/simfinity-fe-components';
+
+- const urqlClient = createClient({ url: 'http://localhost:3000/graphql' });
+
+  function App() {
+    return (
+-     <UrqlProvider value={urqlClient}>
++     <SimfinityClientProvider endpoint="http://localhost:3000/graphql">
+        <ThemeProvider theme={theme}>
+          <I18nProvider>
+            {/* ... */}
+          </I18nProvider>
+        </ThemeProvider>
+-     </UrqlProvider>
++     </SimfinityClientProvider>
+    );
+  }
+```
+
+3. **Update introspection utility imports.** Functions like `getTypeByName`, `buildSelectionSetForObjectType`, `getListEntityFieldNames`, and `unwrapNamedType` have been removed. Use the equivalent methods on the `SimfinityClient` instance obtained via `useSimfinityClient()`:
+
+| Removed function | Replacement |
+|---|---|
+| `getElementTypeNameOfListField(schema, field)` | `client.getTypeNameForQuery(field)` |
+| `buildSelectionSetForObjectType(schema, type)` | `client.buildSelectionSet(type)` |
+| `getListEntityFieldNames(schema)` | `client.getListEntityNames()` |
+| `isNumericScalarName(name)` | `client.isNumericScalar(name)` |
+| `isBooleanScalarName(name)` | `client.isBooleanScalar(name)` |
+| `isDateTimeScalarName(name)` | `client.isDateTimeScalar(name)` |
+| `getTypeByName(schema, name)` | `client.getFieldsOfType(name)` |
+
+## Additional Resources
 
 - [Form Customization Guide](./FORM_CUSTOMIZATION_README.md) - Complete guide for customizing forms, fields, collections, and validation
 - [Navigation Guide](./STABLE_NAVIGATION_GUIDE.md) - Complete guide for navigation and URL handling
 - [TypeScript Definitions](./dist/index.d.ts) - Full TypeScript definitions
 - [Examples Repository](https://github.com/simtlix/simfinity-fe) - Complete usage examples
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please read our contributing guidelines and submit pull requests to our [GitHub repository](https://github.com/simtlix/simfinity-fe-components).
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## Support
 
 For support and questions:
-- 📧 Open an issue on our [GitHub repository](https://github.com/simtlix/simfinity-fe-components/issues)
-- 📚 Check the [documentation](https://github.com/simtlix/simfinity-fe-components#readme)
-- 💬 Join our community discussions
+- Open an issue on our [GitHub repository](https://github.com/simtlix/simfinity-fe-components/issues)
+- Check the [documentation](https://github.com/simtlix/simfinity-fe-components#readme)
+- Join our community discussions

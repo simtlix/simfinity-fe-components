@@ -45,15 +45,13 @@ export default [
     external: [
       'react',
       'react-dom',
-      'urql',
-      'graphql-tag',
       '@emotion/react',
       '@emotion/styled',
       '@mui/material',
       '@mui/icons-material',
       '@mui/system',
       '@mui/x-data-grid',
-      'graphql',
+      '@simtlix/simfinity-js-client',
     ],
   },
   {
@@ -82,7 +80,7 @@ export default [
         modules: true,
         extract: false,
         inject: true,
-        minimize: false, // Debug build - no minification
+        minimize: false,
       }),
       typescript({
         tsconfig: './tsconfig.json',
@@ -92,15 +90,13 @@ export default [
     external: [
       'react',
       'react-dom',
-      'urql',
-      'graphql-tag',
       '@emotion/react',
       '@emotion/styled',
       '@mui/material',
       '@mui/icons-material',
       '@mui/system',
       '@mui/x-data-grid',
-      'graphql',
+      '@simtlix/simfinity-js-client',
     ],
   },
   {

@@ -15,7 +15,7 @@ import {
   Tooltip
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { SchemaData, getTypeByName } from "./lib/introspection";
+import { useSimfinityClient } from "./lib/simfinityClient";
 import { useI18n } from "./lib/i18n";
 import { FormCustomizationState } from "./lib/formCustomization";
 
@@ -32,7 +32,8 @@ export interface FormFieldRendererProps {
   onRemove?: (fieldName: string) => void;
   error?: string;
   disabled?: boolean;
-  schemaData: SchemaData;
+  /** @deprecated Kept for backward compat; component uses SimfinityClient instead */
+  schemaData?: unknown;
   entityTypeName: string;
   customizationState?: FormCustomizationState;
   parentFieldPath?: string;
@@ -40,44 +41,11 @@ export interface FormFieldRendererProps {
   hideIdField?: boolean;
 }
 
-// Helper functions copied from EntityForm
+// Helper: check if field is non-null from type ref shape (used for embedded sub-fields)
 function isNonNullField(typeRef: unknown): boolean {
   if (!typeRef || typeof typeRef !== 'object') return false;
   const type = typeRef as { kind?: string };
   return type.kind === 'NON_NULL';
-}
-
-function getEnumValues(schema: SchemaData, enumTypeName: string): string[] {
-  try {
-    const enumType = schema.__schema.types.find(type => type.name === enumTypeName);
-    if (enumType?.kind === 'ENUM' && 'enumValues' in enumType) {
-      const enumTypeWithValues = enumType as { enumValues: Array<{ name: string }> };
-      return enumTypeWithValues.enumValues.map(ev => ev.name);
-    }
-    return [];
-  } catch (error) {
-    console.error('Error getting enum values:', error);
-    return [];
-  }
-}
-
-function getActualScalarType(name?: string | null): string | null {
-  if (!name) return null;
-  
-  // Handle Simfinity's validated scalar types (e.g., "SeasonNumber_Int")
-  if (name.includes('_')) {
-    const parts = name.split('_');
-    const lastPart = parts[parts.length - 1];
-    
-    // Map common type suffixes to their base types
-    if (['Int', 'Integer'].includes(lastPart)) return 'Int';
-    if (['Float', 'Double', 'Decimal'].includes(lastPart)) return 'Float';
-    if (['String', 'Text'].includes(lastPart)) return 'String';
-    if (['Boolean', 'Bool'].includes(lastPart)) return 'Boolean';
-    if (['Date', 'DateTime', 'Timestamp'].includes(lastPart)) return 'Date';
-  }
-  
-  return name;
 }
 
 export default function FormFieldRenderer({
@@ -87,12 +55,13 @@ export default function FormFieldRenderer({
   onRemove,
   error,
   disabled = false,
-  schemaData,
+  schemaData: _schemaData,
   entityTypeName,
   customizationState,
   parentFieldPath = "",
   hideIdField = false
 }: FormFieldRendererProps) {
+  const client = useSimfinityClient();
   const { resolveLabel } = useI18n();
   
   // Hide ID field if requested
@@ -101,8 +70,11 @@ export default function FormFieldRenderer({
   }
 
   const fieldPath = parentFieldPath ? `${parentFieldPath}.${field.name}` : field.name;
-  const fieldType = getTypeByName(schemaData, field.type);
-  const isRequired = isNonNullField(field);
+  const enumValues = client.getEnumValues(field.type);
+  const typeFields = client.getFieldsOfType(field.type);
+  const isEnum = enumValues.length > 0;
+  const isObject = typeFields.length > 0;
+  const isRequired = field.isNonNull ?? isNonNullField(field);
   
   // Get field customization
   const fieldCustomization = customizationState?.customization[fieldPath];
@@ -171,8 +143,11 @@ export default function FormFieldRenderer({
     );
   }
 
-      // Check if it's an object type (not embedded, not a list)
-    if (fieldType?.kind === 'OBJECT' && !field.extensions?.embedded) {
+  const ex = field.extensions as { relation?: { embedded?: boolean }; embedded?: boolean } | undefined;
+  const isEmbeddedObj = ex?.relation?.embedded === true || ex?.embedded === true;
+
+  // Check if it's an object type (not embedded, not a list)
+  if (isObject && !isEmbeddedObj) {
       // Object field - use ObjectFieldSelector
       // For now, we'll render a simple text field since ObjectFieldSelector needs specific props
       // that we don't have access to in this generic context
@@ -193,9 +168,9 @@ export default function FormFieldRenderer({
     }
 
   // Check if it's an embedded object
-  if (fieldType?.kind === 'OBJECT' && field.extensions?.embedded) {
+  if (isObject && isEmbeddedObj) {
     // Embedded object - render as a section
-    const embeddedFields = fieldType.fields || [];
+    const embeddedFields = typeFields;
     
     return (
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2, mb: 2 }}>
@@ -208,10 +183,10 @@ export default function FormFieldRenderer({
               key={embeddedField.name}
               field={{
                 name: embeddedField.name,
-                type: embeddedField.type.name || 'String',
-                isNonNull: embeddedField.type.kind === 'NON_NULL',
-                isList: embeddedField.type.kind === 'LIST',
-                extensions: embeddedField.extensions || undefined
+                type: embeddedField.type?.name ?? 'String',
+                isNonNull: embeddedField.type?.kind === 'NON_NULL',
+                isList: embeddedField.type?.isList === true,
+                extensions: (embeddedField.extensions as Record<string, unknown>) ?? undefined
               }}
               value={(value as Record<string, unknown>)?.[embeddedField.name]}
               onChange={(subFieldName, subValue) => {
@@ -223,7 +198,6 @@ export default function FormFieldRenderer({
               }}
               error={error}
               disabled={disabled || !isEnabled || isReadOnly}
-              schemaData={schemaData}
               entityTypeName={entityTypeName}
               customizationState={customizationState}
               parentFieldPath={fieldPath}
@@ -237,7 +211,7 @@ export default function FormFieldRenderer({
   }
 
   // Handle scalar types
-  const actualType = getActualScalarType(field.type);
+  const actualType = client.getActualScalarType(field.type);
   
   if (actualType === 'Boolean') {
     return (
@@ -290,8 +264,7 @@ export default function FormFieldRenderer({
   }
 
   // Check if it's an enum
-  if (fieldType?.kind === 'ENUM') {
-    const enumValues = getEnumValues(schemaData, field.type);
+  if (isEnum) {
     
     return (
       <FormControl fullWidth size="small" error={!!error} disabled={disabled || !isEnabled || isReadOnly}>

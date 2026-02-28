@@ -1,6 +1,4 @@
 import * as React from "react";
-import { useQuery } from "urql";
-import { gql } from "graphql-tag";
 import { 
   Box, 
   CircularProgress, 
@@ -8,7 +6,6 @@ import {
   Accordion, 
   AccordionSummary, 
   AccordionDetails,
-  Button,
   Chip,
   Table,
   TableBody,
@@ -27,15 +24,13 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RestoreIcon from "@mui/icons-material/Restore";
-import AddIcon from "@mui/icons-material/Add";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
-import { INTROSPECTION_QUERY, SchemaData, getElementTypeNameOfListField, getListEntityFieldNamesOfType, buildSelectionSetForObjectType, ValueResolver, getTypeByName, unwrapNamedType } from "./lib/introspection";
 import { resolveColumnRenderer } from "./lib/columnRenderers";
 import { useI18n } from "./lib/i18n";
 import CollectionItemEditForm from "./CollectionItemEditForm";
 import { getFormCustomization, getCollectionOnDelete, FormMessage, ParentFormAccess } from "./lib/formCustomization";
+import { useSimfinityClient, useFindByParent, buildValueResolvers } from "./lib/simfinityClient";
 
-// Types for collection item management
 export type CollectionItemStatus = 'original' | 'added' | 'modified' | 'deleted';
 
 export interface CollectionItem {
@@ -62,7 +57,7 @@ type CollectionFieldGridProps = {
   isEditMode?: boolean;
   collectionState?: CollectionFieldState;
   onCollectionStateChange?: (fieldName: string, newState: CollectionFieldState) => void;
-  parentFormAccess?: ParentFormAccess; // Access to parent form data and actions
+  parentFormAccess?: ParentFormAccess;
 };
 
 export default function CollectionFieldGrid({
@@ -74,81 +69,50 @@ export default function CollectionFieldGrid({
   onCollectionStateChange,
   parentFormAccess
 }: CollectionFieldGridProps) {
-  const [{ data: schemaData }] = useQuery({ query: INTROSPECTION_QUERY });
+  const client = useSimfinityClient();
   const { resolveLabel, locale } = useI18n();
-  
-  // Helper function to get entity name from i18n
-  const getEntityName = (pluralName: string, form: 'single' | 'plural'): string => {
-    if (!schemaData) return `entity.${pluralName}.${form}`;
-    
-    // Get the proper entity type name from schema
-    const entityTypeName = getElementTypeNameOfListField(schemaData as SchemaData, pluralName);
-    if (!entityTypeName) return `entity.${pluralName}.${form}`;
-    
-    // Convert to lowercase for i18n key
-    const baseName = entityTypeName.toLowerCase();
-    
-    return `entity.${baseName}.${form}`;
-  };
-  
-  // Helper function to get field information including extensions
-  const getFieldInfo = React.useCallback((fieldName: string) => {
-    if (!schemaData || !collectionField.objectTypeName) return null;
-    
-    const entityType = getTypeByName(schemaData as SchemaData, collectionField.objectTypeName);
-    if (!entityType?.fields) return null;
-    
-    const field = entityType.fields.find(f => f.name === fieldName);
-    if (!field) return null;
-    
-    const fieldType = unwrapNamedType(field.type);
-    const isStateMachine = field.extensions?.stateMachine === true;
-    const isEnum = fieldType && schemaData.__schema.types.find((t: { name?: string; kind?: string }) => t.name === fieldType)?.kind === "ENUM";
-    
-    return {
-      field,
-      fieldType,
-      isStateMachine,
-      isEnum,
-      enumValues: isEnum && fieldType ? 
-        schemaData.__schema.types.find((t: { name?: string; enumValues?: Array<{ name: string }> }) => t.name === fieldType)?.enumValues?.map((ev: { name: string }) => ev.name) || [] 
-        : []
-    };
-  }, [schemaData, collectionField.objectTypeName]);
 
-  // Helper function to render state machine field values
+  const { valueResolvers, selectionMeta } = React.useMemo(
+    () => buildValueResolvers(client, collectionField.objectTypeName),
+    [client, collectionField.objectTypeName]
+  );
+
+  const { selection, columns, sortFieldByColumn } = selectionMeta;
+
+  const getFieldInfo = React.useCallback((fieldName: string) => {
+    const isStateMachine = client.isStateMachineField(collectionField.objectTypeName, fieldName);
+    const fType = selectionMeta.fieldTypeByColumn[fieldName];
+    const enumValues = fType ? client.getEnumValues(fType) : [];
+    const isEnum = enumValues.length > 0;
+    return { isStateMachine, isEnum, enumValues, fieldType: fType };
+  }, [client, collectionField.objectTypeName, selectionMeta.fieldTypeByColumn]);
+
   const renderStateMachineValue = React.useCallback((value: unknown, entityTypeName: string) => {
     if (value == null) return "";
-    
     const stateKey = `stateMachine.${entityTypeName.toLowerCase()}.state.${value}`;
     return resolveLabel([stateKey], { entity: entityTypeName }, String(value));
   }, [resolveLabel]);
-  
-  // Local state for collection management
+
+  const getEntityName = (_pluralName: string, form: 'single' | 'plural'): string => {
+    const baseName = collectionField.objectTypeName.toLowerCase();
+    return `entity.${baseName}.${form}`;
+  };
+
   const [localCollectionState, setLocalCollectionState] = React.useState<CollectionFieldState>({
-    added: [],
-    modified: [],
-    deleted: []
+    added: [], modified: [], deleted: []
   });
 
-  // Edit form state
   const [editFormOpen, setEditFormOpen] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<CollectionItem | null>(null);
   const [isAddingNew, setIsAddingNew] = React.useState(false);
-  
-  // Message state for delete callbacks
   const [message, setMessage] = React.useState<FormMessage | null>(null);
 
-
-
-  // Use provided state or local state
   const currentState = collectionState || localCollectionState;
   const setCurrentState = React.useMemo(() => 
     onCollectionStateChange 
       ? (newState: CollectionFieldState | ((prev: CollectionFieldState) => CollectionFieldState)) => {
           if (typeof newState === 'function') {
-            const updatedState = newState(currentState);
-            onCollectionStateChange(collectionField.name, updatedState);
+            onCollectionStateChange(collectionField.name, newState(currentState));
           } else {
             onCollectionStateChange(collectionField.name, newState);
           }
@@ -157,150 +121,48 @@ export default function CollectionFieldGrid({
     [onCollectionStateChange, collectionField.name, currentState]
   );
 
-  // Pagination and sorting state
   const [page, setPage] = React.useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = React.useState<number>(5);
   const [sortModel, setSortModel] = React.useState<{ field: string; sort: 'asc' | 'desc' }[]>([]);
 
-  // Build selection set for the collection type using the same logic as EntityTable
-  const { selection, columns, valueResolvers, sortFieldByColumn } = React.useMemo(() => {
-    const schema = schemaData as SchemaData | undefined;
-    if (!schema) {
-      return {
-        selection: "id",
-        columns: ["id"],
-        valueResolvers: { id: (r: Record<string, unknown>) => r["id"] } as Record<string, ValueResolver>,
-        sortFieldByColumn: {},
-      } as const;
-    }
-    
-    const collectionTypeName = getElementTypeNameOfListField(schema, collectionField.objectTypeName);
-    if (!collectionTypeName) {
-      return {
-        selection: "id",
-        columns: ["id"],
-        valueResolvers: { id: (r: Record<string, unknown>) => r["id"] } as Record<string, ValueResolver>,
-        sortFieldByColumn: {},
-      } as const;
-    }
-    
-    return { ...buildSelectionSetForObjectType(schema, collectionTypeName), entityTypeName: collectionTypeName } as const;
-  }, [schemaData, collectionField.objectTypeName]);
-
-  // Filter out the connection field from display columns
   const displayColumns = React.useMemo(() => {
     return columns.filter(column => column !== collectionField.connectionField);
   }, [columns, collectionField.connectionField]);
 
-  // Generate the collection query with NIN filter for modified/deleted items
-  const collectionQuery = React.useMemo(() => {
-    if (!schemaData) return null;
-    
-    // Get the correct list query name for this type
-    const listQueryNames = getListEntityFieldNamesOfType(schemaData as SchemaData, collectionField.objectTypeName);
-    const listQueryName = listQueryNames[0]; // Use the first available list query name
-    
-    if (!listQueryName) {
-      console.error(`No list query name found for type: ${collectionField.objectTypeName}`);
-      return null;
-    }
-    
-    console.log(`CollectionFieldGrid: Using list query name '${listQueryName}' for type '${collectionField.objectTypeName}'`);
-    
-    // Generate sort block based on sortModel
-    const sortBlock = sortModel.length > 0
-      ? (() => {
-          const terms = sortModel
-            .map((s) => {
-              const field = (sortFieldByColumn as Record<string, string | undefined>)[s.field] ?? s.field;
-              const order = s.sort === 'asc' ? 'ASC' : 'DESC';
-              return `{ field: "${field}", order: ${order} }`;
-            })
-            .join(', ');
-          return `sort: { terms: [ ${terms} ] }`;
-        })()
-      : `sort: { terms: [{ field: "id", order: ASC }] }`;
+  const excludeIds = React.useMemo(() => {
+    if (!isEditMode) return [];
+    return [
+      ...currentState.modified.map(item => item.id),
+      ...currentState.deleted.map(item => item.id)
+    ];
+  }, [isEditMode, currentState.modified, currentState.deleted]);
 
-    // Build filter to exclude modified and deleted items (but NOT added items)
-    const excludeFilter = isEditMode && (currentState.modified.length > 0 || currentState.deleted.length > 0)
-      ? (() => {
-          const excludeIds = [
-            ...currentState.modified.map(item => item.id),
-            ...currentState.deleted.map(item => item.id)
-            // Note: We do NOT exclude added items since they don't exist in the database yet
-          ];
-          
-          if (excludeIds.length === 0) return '';
-          
-          return `
-            id: { operator: NIN, value: [${excludeIds.map(id => `"${id}"`).join(', ')}] }
-          `;
-        })()
-      : '';
+  const sortTerms = React.useMemo(
+    () => sortModel.map(s => ({
+      field: (sortFieldByColumn as Record<string, string | undefined>)[s.field] ?? s.field,
+      order: (s.sort === 'asc' ? 'ASC' : 'DESC') as 'ASC' | 'DESC'
+    })),
+    [sortModel, sortFieldByColumn]
+  );
 
-    const queryString = `
-      query Get${collectionField.objectTypeName.charAt(0).toUpperCase() + collectionField.objectTypeName.slice(1)}s($parentId: QLValue!, $page: Int!, $size: Int!, $count: Boolean!) {
-        ${listQueryName}(
-          ${collectionField.connectionField}: { terms: { path: "id", operator: EQ, value: $parentId } }
-          ${excludeFilter ? excludeFilter : ''}
-          pagination: { page: $page, size: $size, count: $count }
-          ${sortBlock}
-        ) {
-          ${selection}
-        }
-      }
-    `;
-    
-    try {
-      return gql(queryString);
-    } catch (error) {
-      console.error('Error generating collection query:', error);
-      return null;
-    }
-  }, [collectionField, selection, schemaData, sortModel, sortFieldByColumn, isEditMode, currentState.modified, currentState.deleted]); // Note: currentState.added is intentionally NOT included since added items don't affect the query
-
-  // Execute the collection query
-  const [{ data: collectionData, fetching: collectionLoading, error: collectionError }] = useQuery({
-    query: collectionQuery!,
-    variables: {
-      parentId: parentEntityId,
-      page: page + 1, // Convert to 1-based for GraphQL
+  const { data: collectionItems, loading: collectionLoading, error: collectionError, totalCount } = useFindByParent<Record<string, unknown>>(
+    collectionField.objectTypeName,
+    collectionField.connectionField,
+    parentEntityId || null,
+    {
+      page,
       size: rowsPerPage,
-      count: true,
-    },
-    pause: !collectionQuery || !parentEntityId,
-  });
-
-  // Log collection query execution
-  React.useEffect(() => {
-    if (collectionQuery && parentEntityId) {
-      console.log(`CollectionFieldGrid: Executing query for ${collectionField.name}`, {
-        parentId: parentEntityId,
-        page: page + 1,
-        size: rowsPerPage,
-        excludeIds: [...currentState.modified.map(item => item.id), ...currentState.deleted.map(item => item.id)],
-        addedIds: currentState.added.map(item => item.id), // Added items are NOT excluded from query
-        query: collectionQuery.loc?.source.body
-      });
+      sort: sortTerms,
+      excludeIds,
+      fields: selection,
+      sortFieldByColumn,
     }
-  }, [collectionQuery, parentEntityId, page, rowsPerPage, collectionField.name, currentState.modified, currentState.deleted, currentState.added]);
+  );
 
-  // Process the collection data
   const rows = React.useMemo(() => {
-    if (!collectionData || !collectionField.objectTypeName || !schemaData) return [];
-    
-    // Get the correct list query name for this type
-    const listQueryNames = getListEntityFieldNamesOfType(schemaData as SchemaData, collectionField.objectTypeName);
-    const listQueryName = listQueryNames[0];
-    
-    if (!listQueryName) return [];
-    
-    const items = collectionData[listQueryName] || [];
-    
-    return items.map((item: Record<string, unknown>) => {
+    if (!collectionItems) return [];
+    return collectionItems.map((item) => {
       const processedRow: Record<string, unknown> = { id: item.id };
-      
-      // Apply value resolvers for each column for display purposes
       columns.forEach(column => {
         if (column !== 'id' && valueResolvers[column]) {
           processedRow[column] = valueResolvers[column](item);
@@ -308,321 +170,156 @@ export default function CollectionFieldGrid({
           processedRow[column] = item[column];
         }
       });
-      
-      // Store the original item data for editing (preserving object structure with IDs)
       processedRow.__originalData = item;
-      
       return processedRow;
     });
-  }, [collectionData, collectionField.objectTypeName, columns, valueResolvers, schemaData]);
+  }, [collectionItems, columns, valueResolvers]);
 
-  // Get total count
-  const totalCount = React.useMemo(() => {
-    if (!collectionData || !collectionField.objectTypeName || !schemaData) return 0;
-    
-    // Get the correct list query name for this type
-    const listQueryNames = getListEntityFieldNamesOfType(schemaData as SchemaData, collectionField.objectTypeName);
-    const listQueryName = listQueryNames[0];
-    
-    if (!listQueryName) return 0;
-    
-    const items = collectionData[listQueryName] || [];
-    
-    // For now, we'll use the length of returned items
-    // In a real implementation, you might want to add a count field to the query
-    return items.length;
-  }, [collectionData, collectionField.objectTypeName, schemaData]);
-
-
-
-  // Collection item management functions
   const handleEditItem = React.useCallback((item: Record<string, unknown>) => {
-    // Use the original data for editing to preserve object structure with IDs
     const originalData = item.__originalData as Record<string, unknown>;
-    const editingItemData = originalData || item;
-    
-    console.log('handleEditItem: original item:', item);
-    console.log('handleEditItem: original data:', originalData);
-    console.log('handleEditItem: editing item data:', editingItemData);
-    
-    setEditingItem(editingItemData as CollectionItem);
-    setIsAddingNew(false); // This is editing an existing item, not adding new
+    setEditingItem((originalData || item) as CollectionItem);
+    setIsAddingNew(false);
     setEditFormOpen(true);
   }, []);
 
   const handleDeleteItem = React.useCallback(async (item: Record<string, unknown>) => {
-    // Get onDelete callback for collection
     const parentCustomization = getFormCustomization(parentEntityType, "edit");
-    const onDeleteCallback = getCollectionOnDelete(
-      parentCustomization || {},
-      collectionField.name
-    );
+    const onDeleteCallback = getCollectionOnDelete(parentCustomization || {}, collectionField.name);
 
-    // Execute onDelete callback if available
     if (onDeleteCallback) {
       try {
         const shouldContinue = await onDeleteCallback(item, setMessage);
-
-        // If callback explicitly returns false, stop deletion
-        if (shouldContinue === false) {
-          console.log('Collection item deletion cancelled by onDelete callback');
-          return;
-        }
-      } catch (onDeleteError) {
-        console.error('Error in collection onDelete callback:', onDeleteError);
-        // If onDelete throws an error, stop deletion
-        return;
-      }
+        if (shouldContinue === false) return;
+      } catch { return; }
     }
 
-    // If item was added, remove it completely
     if (currentState.added.some(i => i.id === item.id)) {
-      setCurrentState(prev => ({
-        ...prev,
-        added: prev.added.filter(i => i.id !== item.id)
-      }));
+      setCurrentState(prev => ({ ...prev, added: prev.added.filter(i => i.id !== item.id) }));
       return;
     }
-
-    // If item was modified, move it to deleted
     if (currentState.modified.some(i => i.id === item.id)) {
       const modifiedItem = currentState.modified.find(i => i.id === item.id);
       if (modifiedItem) {
-        const deletedItem: CollectionItem = { 
-          ...modifiedItem, 
-          __status: 'deleted' as CollectionItemStatus 
-        };
         setCurrentState(prev => ({
           ...prev,
           modified: prev.modified.filter(i => i.id !== item.id),
-          deleted: [...prev.deleted, deletedItem]
+          deleted: [...prev.deleted, { ...modifiedItem, __status: 'deleted' as CollectionItemStatus }]
         }));
       }
       return;
     }
-
-    // If item is original, move it to deleted
-    const deletedItem: CollectionItem = { 
-      ...item, 
-      __status: 'deleted' as CollectionItemStatus 
-    } as CollectionItem;
     setCurrentState(prev => ({
       ...prev,
-      deleted: [...prev.deleted, deletedItem]
+      deleted: [...prev.deleted, { ...item, __status: 'deleted' as CollectionItemStatus } as CollectionItem]
     }));
   }, [currentState.added, currentState.modified, setCurrentState, parentEntityType, collectionField.name]);
 
   const handleRestoreItem = React.useCallback((item: CollectionItem) => {
     if (item.__status === 'deleted') {
-      // Restore deleted item to original state
-      setCurrentState(prev => ({
-        ...prev,
-        deleted: prev.deleted.filter(i => i.id !== item.id)
-      }));
+      setCurrentState(prev => ({ ...prev, deleted: prev.deleted.filter(i => i.id !== item.id) }));
     } else if (item.__status === 'modified') {
-      // Restore modified item to original state
-      setCurrentState(prev => ({
-        ...prev,
-        modified: prev.modified.filter(i => i.id !== item.id)
-      }));
+      setCurrentState(prev => ({ ...prev, modified: prev.modified.filter(i => i.id !== item.id) }));
     }
   }, [setCurrentState]);
 
   const handleAddItem = React.useCallback(() => {
-    // Create a new empty item for the form
     const newItem: CollectionItem = {
       id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       __status: 'added',
-      // Initialize with empty values for all display columns except id
       ...Object.fromEntries(displayColumns.map(col => [col, col === 'id' ? undefined : '']))
     };
-
-    // Set the editing item and open the form
     setEditingItem(newItem);
     setIsAddingNew(true);
     setEditFormOpen(true);
   }, [displayColumns]);
 
-  // Handle saving edited item
   const handleSaveEditedItem = React.useCallback((updatedItem: CollectionItem) => {
     if (isAddingNew) {
-      // This is a new item being added
-      const savedItem = {
-        ...updatedItem,
-        __status: 'added' as const,
-        __originalData: { ...updatedItem } // Store current state as original for new items
-      };
-      
-      console.log('handleSaveEditedItem: adding new item:', savedItem);
-      
-      setCurrentState(prev => ({
-        ...prev,
-        added: [...prev.added, savedItem]
-      }));
+      const savedItem = { ...updatedItem, __status: 'added' as const, __originalData: { ...updatedItem } };
+      setCurrentState(prev => ({ ...prev, added: [...prev.added, savedItem] }));
     } else {
-      // This is an existing item being modified
-      const savedItem = {
-        ...updatedItem,
-        __originalData: updatedItem.__originalData || editingItem?.__originalData
-      };
-      
-      console.log('handleSaveEditedItem: updating existing item:', savedItem);
-      
-      // Check if the item being edited is an added item
+      const savedItem = { ...updatedItem, __originalData: updatedItem.__originalData || editingItem?.__originalData };
       const isEditingAddedItem = currentState.added.some(i => i.id === updatedItem.id);
-      
       if (isEditingAddedItem) {
-        // If editing an added item, update it in the added list
-        setCurrentState(prev => ({
-          ...prev,
-          added: prev.added.map(i => i.id === updatedItem.id ? savedItem : i)
-        }));
+        setCurrentState(prev => ({ ...prev, added: prev.added.map(i => i.id === updatedItem.id ? savedItem : i) }));
       } else {
-        // If editing an existing item, move it to modified list
-        setCurrentState(prev => ({
-          ...prev,
-          modified: [...prev.modified.filter(i => i.id !== updatedItem.id), savedItem]
-        }));
+        setCurrentState(prev => ({ ...prev, modified: [...prev.modified.filter(i => i.id !== updatedItem.id), savedItem] }));
       }
     }
-    
     setEditFormOpen(false);
     setEditingItem(null);
     setIsAddingNew(false);
   }, [setCurrentState, editingItem, isAddingNew, currentState.added]);
 
-  // Helper function to render cell content with custom renderers
   const renderCellContent = React.useCallback((item: Record<string, unknown>, column: string): React.ReactNode => {
     if (column === 'id') return item[column]?.toString() || '';
-    
-    // Use the current item data (new value) instead of original data
-    const dataToUse = item;
-    
-    // Get the raw value
-    const value = valueResolvers[column] ? valueResolvers[column](dataToUse) : dataToUse[column];
-    
-    // Check if this is a state machine field
+    const value = valueResolvers[column] ? valueResolvers[column](item) : item[column];
     const fieldInfo = getFieldInfo(column);
-    if (fieldInfo?.isStateMachine) {
-      const internationalizedValue = renderStateMachineValue(value, collectionField.objectTypeName);
-      return <span>{internationalizedValue}</span>;
+    if (fieldInfo.isStateMachine) {
+      return <span>{renderStateMachineValue(value, collectionField.objectTypeName)}</span>;
     }
-    
-    // Apply custom column renderers if available
     const renderer = resolveColumnRenderer(`${collectionField.objectTypeName}.${column}`);
     if (renderer) {
-      return renderer({ 
-        entity: collectionField.objectTypeName, 
-        field: column, 
-        row: dataToUse, 
-        value, 
-        gridParams: { row: dataToUse, value, field: column, colDef: { field: column } } as { row: Record<string, unknown>; value: unknown; field: string; colDef: { field: string } }
-      });
+      return renderer({ entity: collectionField.objectTypeName, field: column, row: item, value, gridParams: { row: item, value, field: column, colDef: { field: column } } as { row: Record<string, unknown>; value: unknown; field: string; colDef: { field: string } } });
     }
-    
-    // Fallback to string representation
     return value?.toString() || '';
   }, [valueResolvers, collectionField.objectTypeName, getFieldInfo, renderStateMachineValue]);
 
-
-
-  // Build grid columns (moved here after function definitions)
   const gridColumns: GridColDef[] = React.useMemo(() => {
     const baseColumns = displayColumns.map(column => {
       const columnDef: GridColDef = {
         field: column,
         headerName: resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column),
-        flex: 1,
-        minWidth: 150,
-        sortable: true,
-        filterable: false, // Disable filtering for now to keep it simple
+        flex: 1, minWidth: 150, sortable: true, filterable: false,
       };
-
-      // Check if this is a state machine field
       const fieldInfo = getFieldInfo(column);
-      if (fieldInfo?.isStateMachine) {
+      if (fieldInfo.isStateMachine) {
         columnDef.renderCell = (params) => {
           const value = valueResolvers[column] ? valueResolvers[column](params.row) : params.row[column];
-          const internationalizedValue = renderStateMachineValue(value, collectionField.objectTypeName);
-          return <span>{internationalizedValue}</span>;
+          return <span>{renderStateMachineValue(value, collectionField.objectTypeName)}</span>;
         };
       } else {
-        // Apply custom column renderers if available
         const renderer = resolveColumnRenderer(`${collectionField.objectTypeName}.${column}`);
         if (renderer) {
           columnDef.renderCell = (params) => {
             const value = valueResolvers[column] ? valueResolvers[column](params.row) : params.row[column];
-            return (
-              <>{renderer({ 
-                entity: collectionField.objectTypeName, 
-                field: column, 
-                row: params.row, 
-                value, 
-                gridParams: params 
-              })}</>
-            );
+            return <>{renderer({ entity: collectionField.objectTypeName, field: column, row: params.row, value, gridParams: params })}</>;
           };
         }
       }
-
       return columnDef;
     });
 
-    // Add action column for edit mode
     if (isEditMode) {
       baseColumns.push({
         field: 'actions',
         headerName: resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions"),
-        width: 100,
-        sortable: false,
-        filterable: false,
-        disableColumnMenu: true,
+        width: 100, sortable: false, filterable: false, disableColumnMenu: true,
         renderCell: (params) => (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title={resolveLabel(["collection.actions.edit"], { entity: collectionField.objectTypeName }, "Edit")}>
-              <IconButton
-                size="small"
-                onClick={() => handleEditItem(params.row)}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
+              <IconButton size="small" onClick={() => handleEditItem(params.row)}><EditIcon fontSize="small" /></IconButton>
             </Tooltip>
             <Tooltip title={resolveLabel(["collection.actions.delete"], { entity: collectionField.objectTypeName }, "Delete")}>
-              <IconButton
-                size="small"
-                color="error"
-                onClick={() => handleDeleteItem(params.row)}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
+              <IconButton size="small" color="error" onClick={() => handleDeleteItem(params.row)}><DeleteIcon fontSize="small" /></IconButton>
             </Tooltip>
           </Box>
         ),
       });
     }
-
     return baseColumns;
   }, [collectionField.objectTypeName, collectionField.name, resolveLabel, valueResolvers, isEditMode, handleEditItem, handleDeleteItem, displayColumns, getFieldInfo, renderStateMachineValue]);
 
-  // Handle pagination change
   const handlePaginationModelChange = (newModel: GridPaginationModel) => {
-    if (newModel.pageSize !== rowsPerPage) {
-      setRowsPerPage(newModel.pageSize);
-      setPage(0);
-    } else if (newModel.page !== page) {
-      setPage(newModel.page);
-    }
+    if (newModel.pageSize !== rowsPerPage) { setRowsPerPage(newModel.pageSize); setPage(0); }
+    else if (newModel.page !== page) { setPage(newModel.page); }
   };
 
-  console.log(`CollectionFieldGrid: parentEntityType=${parentEntityType}, collectionField.name=${collectionField.name}`);
-  // Get section label using proper i18n format
   const sectionLabel = resolveLabel([`${parentEntityType.toLowerCase()}.${collectionField.name}`], { entity: collectionField.objectTypeName }, collectionField.objectTypeName);
 
-  // DataGrid locale text for internationalization
   const localeText = React.useMemo(() => {
     const t = (k: string, d: string) => resolveLabel([`grid.${k}`], { entity: collectionField.objectTypeName }, d);
     return {
-      // Column menu
       columnMenuSortAsc: t('columnMenu.sortAsc', 'Sort by ASC'),
       columnMenuSortDesc: t('columnMenu.sortDesc', 'Sort by DESC'),
       columnMenuFilter: t('columnMenu.filter', 'Filter'),
@@ -630,9 +327,7 @@ export default function CollectionFieldGrid({
       columnMenuManageColumns: t('columnMenu.manageColumns', 'Manage columns'),
       columnMenuShowColumns: t('columnMenu.showColumns', 'Show columns'),
       columnMenuUnsort: t('columnMenu.unsort', 'Unsort'),
-      // Input Label
       filterPanelInputLabel: t('filterPanel.inputLabel', 'Value'),
-      // Footer
       footerRowSelected: (count: number) =>
         count !== 1
           ? t('footer.rowsSelected', `${count.toLocaleString()} rows selected`)
@@ -643,15 +338,9 @@ export default function CollectionFieldGrid({
   const PaginationComponent = React.useMemo(
     () => () => (
       <TablePagination
-        component="div"
-        count={totalCount ?? -1}
-        page={page}
-        rowsPerPage={rowsPerPage}
+        component="div" count={totalCount ?? -1} page={page} rowsPerPage={rowsPerPage}
         onPageChange={(_, newPage) => setPage(newPage)}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value, 10));
-          setPage(0);
-        }}
+        onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
         rowsPerPageOptions={[5, 10, 25]}
         labelRowsPerPage={resolveLabel(['grid.pagination.rowsPerPage'], { entity: collectionField.objectTypeName }, 'Rows per page:')}
         labelDisplayedRows={({ from, to, count }: { from: number; to: number; count: number }) => {
@@ -663,7 +352,9 @@ export default function CollectionFieldGrid({
     [locale, totalCount, page, rowsPerPage, resolveLabel, collectionField.objectTypeName]
   );
 
-  if (!collectionQuery) {
+  const queryReady = !!parentEntityId;
+
+  if (!queryReady) {
     return (
       <Accordion defaultExpanded>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -684,7 +375,6 @@ export default function CollectionFieldGrid({
         </AccordionSummary>
         <AccordionDetails>
         <Box sx={{ width: '100%', overflowX: 'auto' }}>
-          {/* Main collection grid */}
           <Box sx={{ width: '100%', mb: 3 }}>
             {collectionLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -700,11 +390,7 @@ export default function CollectionFieldGrid({
                 {(isEditMode || parentEntityId === "") && (
                   <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
                     <Tooltip title={`${resolveLabel(["collection.button.create"], { entity: collectionField.objectTypeName }, "Add")} ${resolveLabel([getEntityName(collectionField.objectTypeName, 'single')], { entity: collectionField.objectTypeName }, collectionField.objectTypeName)}`}>
-                      <IconButton
-                        color="primary"
-                        size="large"
-                        onClick={handleAddItem}
-                      >
+                      <IconButton color="primary" size="large" onClick={handleAddItem}>
                         <AddCircleIcon fontSize="large" />
                       </IconButton>
                     </Tooltip>
@@ -719,15 +405,12 @@ export default function CollectionFieldGrid({
                   <Paper variant="outlined">
                     <DataGrid
                       key={`collection-datagrid-${locale}`}
-                      rows={rows}
-                      columns={gridColumns}
-                      pagination
+                      rows={rows} columns={gridColumns} pagination
                       paginationModel={{ page, pageSize: rowsPerPage }}
                       onPaginationModelChange={handlePaginationModelChange}
                       pageSizeOptions={[5, 10, 25]}
                       rowCount={totalCount}
-                      paginationMode="server"
-                      sortingMode="server"
+                      paginationMode="server" sortingMode="server"
                       sortModel={sortModel}
                       onSortModelChange={(model) => {
                         const norm = (Array.isArray(model) ? model : [])
@@ -737,9 +420,7 @@ export default function CollectionFieldGrid({
                       }}
                       loading={collectionLoading}
                       localeText={localeText}
-                      slots={{
-                        pagination: PaginationComponent,
-                      }}
+                      slots={{ pagination: PaginationComponent }}
                       disableRowSelectionOnClick
                     />
                   </Paper>
@@ -748,49 +429,24 @@ export default function CollectionFieldGrid({
             )}
           </Box>
 
-          {/* Local state tables for create/edit mode */}
           {(isEditMode || parentEntityId === "") && (
             <Box sx={{ mt: 3 }}>
-              {/* Modified items table */}
               {currentState.modified.length > 0 && (
                 <Box sx={{ mb: 3 }}>
-                  <Typography variant="h6" sx={{ mb: 2 }}>
-                    Modified Items
-                    <Chip 
-                      label={currentState.modified.length} 
-                      size="small" 
-                      color="warning" 
-                      sx={{ ml: 1 }} 
-                    />
-                  </Typography>
+                  <Typography variant="h6" sx={{ mb: 2 }}>Modified Items<Chip label={currentState.modified.length} size="small" color="warning" sx={{ ml: 1 }} /></Typography>
                   <TableContainer component={Paper} variant="outlined">
                     <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          {displayColumns.map(column => (
-                            <TableCell key={column}>
-                              {resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}
-                            </TableCell>
-                          ))}
-                          <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
-                        </TableRow>
-                      </TableHead>
+                      <TableHead><TableRow>
+                        {displayColumns.map(column => (<TableCell key={column}>{resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}</TableCell>))}
+                        <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
+                      </TableRow></TableHead>
                       <TableBody>
                         {currentState.modified.map((item) => (
                           <TableRow key={item.id}>
-                            {displayColumns.map(column => (
-                              <TableCell key={column}>
-                                {renderCellContent(item, column)}
-                              </TableCell>
-                            ))}
+                            {displayColumns.map(column => (<TableCell key={column}>{renderCellContent(item, column)}</TableCell>))}
                             <TableCell>
                               <Tooltip title={resolveLabel(["collection.actions.revert"], { entity: collectionField.objectTypeName }, "Revert Changes")}>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleRestoreItem(item)}
-                                >
-                                  <RestoreIcon fontSize="small" />
-                                </IconButton>
+                                <IconButton size="small" onClick={() => handleRestoreItem(item)}><RestoreIcon fontSize="small" /></IconButton>
                               </Tooltip>
                             </TableCell>
                           </TableRow>
@@ -801,46 +457,22 @@ export default function CollectionFieldGrid({
                 </Box>
               )}
 
-              {/* Deleted items table */}
               {currentState.deleted.length > 0 && (
                 <Box sx={{ mb: 3 }}>
-                  <Typography variant="h6" sx={{ mb: 2 }}>
-                    Deleted Items
-                    <Chip 
-                      label={currentState.deleted.length} 
-                      size="small" 
-                      color="error" 
-                      sx={{ ml: 1 }} 
-                    />
-                  </Typography>
+                  <Typography variant="h6" sx={{ mb: 2 }}>Deleted Items<Chip label={currentState.deleted.length} size="small" color="error" sx={{ ml: 1 }} /></Typography>
                   <TableContainer component={Paper} variant="outlined">
                     <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          {displayColumns.map(column => (
-                            <TableCell key={column}>
-                              {resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}
-                            </TableCell>
-                          ))}
-                          <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
-                        </TableRow>
-                      </TableHead>
+                      <TableHead><TableRow>
+                        {displayColumns.map(column => (<TableCell key={column}>{resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}</TableCell>))}
+                        <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
+                      </TableRow></TableHead>
                       <TableBody>
                         {currentState.deleted.map((item) => (
                           <TableRow key={item.id}>
-                            {displayColumns.map(column => (
-                              <TableCell key={column}>
-                                {renderCellContent(item, column)}
-                              </TableCell>
-                            ))}
+                            {displayColumns.map(column => (<TableCell key={column}>{renderCellContent(item, column)}</TableCell>))}
                             <TableCell>
                               <Tooltip title={resolveLabel(["collection.actions.restore"], { entity: collectionField.objectTypeName }, "Restore")}>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleRestoreItem(item)}
-                                >
-                                  <RestoreIcon fontSize="small" />
-                                </IconButton>
+                                <IconButton size="small" onClick={() => handleRestoreItem(item)}><RestoreIcon fontSize="small" /></IconButton>
                               </Tooltip>
                             </TableCell>
                           </TableRow>
@@ -851,57 +483,26 @@ export default function CollectionFieldGrid({
                 </Box>
               )}
 
-              {/* Added items table */}
               {currentState.added.length > 0 && (
                 <Box sx={{ mb: 3 }}>
-                  <Typography variant="h6" sx={{ mb: 2 }}>
-                    Added Items
-                    <Chip 
-                      label={currentState.added.length} 
-                      size="small" 
-                      color="success" 
-                      sx={{ mb: 1 }} 
-                    />
-                  </Typography>
+                  <Typography variant="h6" sx={{ mb: 2 }}>Added Items<Chip label={currentState.added.length} size="small" color="success" sx={{ mb: 1 }} /></Typography>
                   <TableContainer component={Paper} variant="outlined">
                     <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          {displayColumns.map(column => (
-                            <TableCell key={column}>
-                              {resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}
-                            </TableCell>
-                          ))}
-                          <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
-                        </TableRow>
-                      </TableHead>
+                      <TableHead><TableRow>
+                        {displayColumns.map(column => (<TableCell key={column}>{resolveLabel([`${collectionField.objectTypeName.toLowerCase()}.${column}`], { entity: collectionField.name, field: column }, column)}</TableCell>))}
+                        <TableCell>{resolveLabel(["collection.actions.column"], { entity: collectionField.objectTypeName }, "Actions")}</TableCell>
+                      </TableRow></TableHead>
                       <TableBody>
                         {currentState.added.map((item) => (
                           <TableRow key={item.id}>
-                            {displayColumns.map(column => (
-                              <TableCell key={column}>
-                                {renderCellContent(item, column)}
-                              </TableCell>
-                            ))}
+                            {displayColumns.map(column => (<TableCell key={column}>{renderCellContent(item, column)}</TableCell>))}
                             <TableCell>
                               <Box sx={{ display: 'flex', gap: 1 }}>
                                 <Tooltip title={resolveLabel(["collection.actions.edit"], { entity: collectionField.objectTypeName }, "Edit")}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleEditItem(item)}
-                                    color="primary"
-                                  >
-                                    <EditIcon fontSize="small" />
-                                  </IconButton>
+                                  <IconButton size="small" onClick={() => handleEditItem(item)} color="primary"><EditIcon fontSize="small" /></IconButton>
                                 </Tooltip>
                                 <Tooltip title={resolveLabel(["collection.actions.remove"], { entity: collectionField.objectTypeName }, "Remove")}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleDeleteItem(item)}
-                                    color="error"
-                                  >
-                                    <DeleteIcon fontSize="small" />
-                                  </IconButton>
+                                  <IconButton size="small" onClick={() => handleDeleteItem(item)} color="error"><DeleteIcon fontSize="small" /></IconButton>
                                 </Tooltip>
                               </Box>
                             </TableCell>
@@ -918,22 +519,16 @@ export default function CollectionFieldGrid({
       </AccordionDetails>
     </Accordion>
 
-    {/* Message display */}
     {message && (
       <Alert severity={message.type} sx={{ mt: 2 }} onClose={() => setMessage(null)}>
         {typeof message.message === 'string' ? message.message : message.message}
       </Alert>
     )}
 
-    {/* Edit form dialog */}
     {editingItem && editFormOpen && (
       <CollectionItemEditForm
         open={editFormOpen}
-        onClose={() => {
-          setEditFormOpen(false);
-          setEditingItem(null);
-          setIsAddingNew(false);
-        }}
+        onClose={() => { setEditFormOpen(false); setEditingItem(null); setIsAddingNew(false); }}
         item={editingItem}
         collectionFieldName={collectionField.name}
         objectTypeName={collectionField.objectTypeName}

@@ -18,3 +18,4 @@ export * from './lib/formCustomization';
 export * from './lib/i18n';
 export * from './lib/introspection';
 export * from './lib/stateMachineRegistry';
+export * from './lib/simfinityClient';

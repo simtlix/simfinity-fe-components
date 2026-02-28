@@ -1,6 +1,5 @@
 import * as React from "react";
-import { useQuery } from "urql";
-import { gql } from "graphql-tag";
+import { useSearch, useEntityById } from "./lib/simfinityClient";
 import {
   Box,
   Chip,
@@ -72,131 +71,45 @@ export default function ObjectFieldSelector({
     }
   }, [value, selectedObject, descriptionField]);
 
-  // Helper function to cast search term to proper type
-  const castSearchTerm = React.useCallback((term: string, fieldType: string) => {
-    if (!term) return term;
-    
-    // Handle Simfinity validated scalars (e.g., "SeasonNumber_Int" -> "Int")
-    const actualType = fieldType.includes('_') ? fieldType.split('_').pop() : fieldType;
-    
-    switch (actualType?.toLowerCase()) {
-      case 'int':
-      case 'integer':
-        const intValue = parseInt(term, 10);
-        return isNaN(intValue) ? term : intValue;
-      case 'float':
-      case 'double':
-        const floatValue = parseFloat(term);
-        return isNaN(floatValue) ? term : floatValue;
-      case 'boolean':
-        if (term.toLowerCase() === 'true') return true;
-        if (term.toLowerCase() === 'false') return false;
-        return term;
-      case 'string':
-      default:
-        return term;
-    }
-  }, []);
+  const selectedId = typeof value === "string" ? value : (value as { id: string; [key: string]: unknown })?.id ?? null;
 
-  // Generate dynamic search query using the provided list query name
-  const generateSearchQuery = React.useMemo(() => {
-    if (!listQueryName || !descriptionField) return null;
-    
-    // Determine the operator based on the field type
-    const isStringType = descriptionFieldType.toLowerCase() === 'string';
-    const operator = isStringType ? 'LIKE' : 'EQ';
-    
-    // Create the query string dynamically using the Simfinity pattern with pagination
-    const queryString = `
-      query Search${listQueryName.charAt(0).toUpperCase() + listQueryName.slice(1)}($page: Int!, $size: Int!, $count: Boolean!, $searchTerm: QLValue!) {
-        ${listQueryName}(
-          pagination: {page: $page, size: $size, count: $count}
-          ${descriptionField}: {operator: ${operator}, value: $searchTerm}
-        ) {
-          id
-          ${descriptionField}
-          __typename
-        }
-      }
-    `;
-    
-    try {
-      // Use gql with the query string
-      return gql(queryString);
-    } catch (error) {
-      console.error('Error generating search query:', error);
-      return null;
-    }
-  }, [listQueryName, descriptionField, descriptionFieldType]);
+  const { data: searchResults, loading: searchLoading, error: searchError } = useSearch<{ id: string; [key: string]: unknown }>(
+    objectTypeName,
+    searchTerm,
+    { displayField: descriptionField, page: 1, size: 10, pause: searchTerm.length < 1 || !isOpen }
+  );
 
-  // Fetch search results when search term is 1+ characters
-  const [{ data: searchData, fetching: searchLoading, error: searchError }] = useQuery({
-    query: generateSearchQuery!,
-    variables: {
-      page: 1,
-      size: 10,
-      count: false,
-      searchTerm: castSearchTerm(searchTerm, descriptionFieldType),
-    },
-    pause: searchTerm.length < 1 || !isOpen || !generateSearchQuery,
-  });
+  const { data: selectedObjectData, error: selectedError } = useEntityById<{ id: string; [key: string]: unknown }>(
+    objectTypeName,
+    selectedId,
+    `id ${descriptionField}`
+  );
 
   // Log any search errors
   React.useEffect(() => {
     if (searchError) {
-      console.error('Search query error:', searchError);
+      console.error("Search query error:", searchError);
     }
   }, [searchError]);
-
-  // Generate dynamic query for selected object data using the provided single query name
-  const generateSelectedObjectQuery = React.useMemo(() => {
-    if (!singleQueryName || !descriptionField) return null;
-    
-    const queryString = `
-      query Get${singleQueryName.charAt(0).toUpperCase() + singleQueryName.slice(1)}($id: ID!) {
-        ${singleQueryName}(id: $id) {
-          id
-          ${descriptionField}
-        }
-      }
-    `;
-    
-    try {
-      return gql(queryString);
-    } catch (error) {
-      console.error('Error generating selected object query:', error);
-      return null;
-    }
-  }, [singleQueryName, descriptionField]);
-
-  // Load selected object data when value changes
-  const [{ data: selectedData, error: selectedError }] = useQuery({
-    query: generateSelectedObjectQuery!,
-    variables: { id: typeof value === 'string' ? value : (value as { id: string; [key: string]: unknown })?.id },
-    pause: !value || !generateSelectedObjectQuery,
-  });
 
   // Log any selected object errors
   React.useEffect(() => {
     if (selectedError) {
-      console.error('Selected object query error:', selectedError);
+      console.error("Selected object query error:", selectedError);
     }
   }, [selectedError]);
 
   // Update selected object when data is loaded
   React.useEffect(() => {
-    if (selectedData && value) {
-      const object = selectedData[singleQueryName];
-      if (object) {
-        setSelectedObject({
-          id: object.id,
-          [descriptionField]: object[descriptionField],
-        });
-      }
-    } else {
+    if (selectedObjectData && value) {
+      setSelectedObject({
+        id: selectedObjectData.id,
+        [descriptionField]: selectedObjectData[descriptionField],
+      });
+    } else if (!value) {
       setSelectedObject(null);
     }
-  }, [selectedData, value, singleQueryName, descriptionField]);
+  }, [selectedObjectData, value, descriptionField]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = event.target.value;
@@ -232,15 +145,7 @@ export default function ObjectFieldSelector({
     setTimeout(() => setIsOpen(false), 200);
   };
 
-  // Get search results from the dynamic query response
-  const getSearchResults = () => {
-    if (!searchData || !listQueryName) return [];
-    
-    // Use the list query name directly for the response key
-    return searchData[listQueryName] || [];
-  };
-
-  const searchResults = getSearchResults();
+  const searchResultsList = searchResults ?? [];
 
   return (
     <Box>
@@ -283,7 +188,7 @@ export default function ObjectFieldSelector({
 
       {/* Search results popup */}
       <Popper
-        open={isOpen && searchResults.length > 0}
+        open={isOpen && searchResultsList.length > 0}
         anchorEl={anchorRef.current}
         placement="bottom-start"
         style={{ zIndex: 1300, width: anchorRef.current?.offsetWidth }}
@@ -295,14 +200,14 @@ export default function ObjectFieldSelector({
             </Box>
           ) : (
             <List dense>
-              {searchResults.map((object: { id: string; [key: string]: string }) => (
+              {searchResultsList.map((object: { id: string; [key: string]: unknown }) => (
                 <ListItem key={object.id} disablePadding>
                   <ListItemButton
                     onClick={() => handleSelectObject(object)}
                     selected={selectedObject?.id === object.id}
                   >
                     <ListItemText
-                      primary={object[descriptionField] || object.id}
+                      primary={String(object[descriptionField] ?? object.id ?? "")}
                       secondary={`ID: ${object.id}`}
                     />
                   </ListItemButton>

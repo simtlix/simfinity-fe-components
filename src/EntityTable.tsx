@@ -1,217 +1,126 @@
 import * as React from "react";
-import { gql } from "graphql-tag";
-import { useClient, useQuery } from "urql";
-import { Box, CircularProgress, Paper, Typography, Button, Stack, IconButton, Tooltip, TablePagination } from "@mui/material";
+import { Box, CircularProgress, Paper, Typography, Stack, IconButton, Tooltip, TablePagination } from "@mui/material";
 import { DataGrid, type GridColDef, type GridPaginationModel, type GridFilterModel, type GridFilterOperator, getGridNumericOperators, getGridBooleanOperators, GridFilterInputValue } from "@mui/x-data-grid";
 import ServerToolbar from "./ServerToolbar";
 import ServerFilterPanel from "./ServerFilterPanel";
 import { TagsFilterInput, BetweenFilterInput, DateFilterInput, StateMachineFilterInput } from "./FilterInputs";
-import { INTROSPECTION_QUERY, SchemaData, getElementTypeNameOfListField, buildSelectionSetForObjectType, ValueResolver, isNumericScalarName, isBooleanScalarName, isDateTimeScalarName, getTypeByName, unwrapNamedType } from "./lib/introspection";
+import type { ValueResolver } from "./lib/introspection";
 import { resolveColumnRenderer } from "./lib/columnRenderers";
 import { useI18n } from "./lib/i18n";
+import { useSimfinityClient, useFind, buildValueResolvers, type FilterItem } from "./lib/simfinityClient";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 
 type EntityTableProps = {
-  listField: string; // e.g., "series"
-  // Optional navigation and URL handling
+  listField: string;
   onNavigate?: (path: string) => void;
   getSearchParams?: () => URLSearchParams;
   onSearchParamsChange?: (params: URLSearchParams) => void;
 };
 
-function buildPaginatedListQuery(listField: string, selection: string, sortBlock: string | null, filterBlock: string | null) {
-  const sortArg = sortBlock ? `, ${sortBlock}` : "";
-  const filterArgs = filterBlock ? `, ${filterBlock}` : "";
-  return gql`
-    query DynamicList($page: Int!, $size: Int!, $count: Boolean!) {
-      ${listField}(pagination: { page: $page, size: $size, count: $count }${sortArg}${filterArgs}) {
-        ${selection}
-      }
-    }
-  `;
+const OPERATOR_MAP: Record<string, string> = {
+  contains: 'LIKE', startsWith: 'LIKE', endsWith: 'LIKE', equals: 'EQ', '=': 'EQ', is: 'EQ',
+  '!=': 'NE', not: 'NE', greaterThan: 'GT', '>': 'GT', greaterThanOrEqual: 'GTE', '>=': 'GTE',
+  lessThan: 'LT', '<': 'LT', lessThanOrEqual: 'LTE', '<=': 'LTE',
+  isAnyOf: 'IN', in: 'IN', nin: 'NIN', btw: 'BTW',
+};
+
+function gridFilterModelToFilterItems(model: GridFilterModel): FilterItem[] {
+  if (!model?.items?.length) return [];
+  const items: FilterItem[] = [];
+  for (const item of model.items) {
+    if (!item.field || item.value == null || item.value === '') continue;
+    const operator = OPERATOR_MAP[item.operator ?? 'equals'] ?? 'EQ';
+    items.push({ field: String(item.field), operator, value: item.value });
+  }
+  return items;
 }
 
 type Row = Record<string, unknown>;
 
-function EntityTable({ 
-  listField, 
+function EntityTable({
+  listField,
   onNavigate,
   getSearchParams,
-  onSearchParamsChange 
+  onSearchParamsChange,
 }: EntityTableProps) {
-  const client = useClient();
-  const [{ data: schemaData }] = useQuery({ query: INTROSPECTION_QUERY });
+  const client = useSimfinityClient();
   const { resolveLabel, locale } = useI18n();
-  
-  // URL parameters handling - use provided function or fallback to window.location
+
+  const entityTypeName = React.useMemo(
+    () => client.getTypeNameForQuery(listField) ?? listField,
+    [client, listField]
+  );
+
+  const { valueResolvers, selectionMeta } = React.useMemo(
+    () => buildValueResolvers(client, entityTypeName),
+    [client, entityTypeName]
+  );
+
+  const { selection, columns: resolvedColumns, sortFieldByColumn, fieldTypeByColumn } = selectionMeta;
+
+  const getFieldInfo = React.useCallback((fieldName: string) => {
+    const isStateMachine = client.isStateMachineField(entityTypeName, fieldName);
+    const fType = fieldTypeByColumn[fieldName];
+    const enumValues = fType ? client.getEnumValues(fType) : [];
+    const isEnum = enumValues.length > 0;
+
+    return { isStateMachine, isEnum, enumValues, fieldType: fType };
+  }, [client, entityTypeName, fieldTypeByColumn]);
+
+  const renderStateMachineValue = React.useCallback((value: unknown, etn: string) => {
+    if (value == null) return "";
+    const stateKey = `stateMachine.${etn.toLowerCase()}.state.${value}`;
+    return resolveLabel([stateKey], { entity: etn }, String(value));
+  }, [resolveLabel]);
+
   const searchParams = React.useMemo(() => {
-    if (getSearchParams) {
-      return getSearchParams();
-    }
-    // Fallback for browser environments
-    if (typeof window !== 'undefined') {
-      return new URLSearchParams(window.location.search);
-    }
+    if (getSearchParams) return getSearchParams();
+    if (typeof window !== 'undefined') return new URLSearchParams(window.location.search);
     return new URLSearchParams();
   }, [getSearchParams]);
-  
-  // Create a stable string representation to prevent unnecessary re-renders
+
   const searchParamsString = React.useMemo(() => searchParams.toString(), [searchParams]);
-  
-  // Navigation handling - use provided function or fallback to window.location
+
   const navigate = React.useCallback((path: string) => {
-    if (onNavigate) {
-      onNavigate(path);
-    } else if (typeof window !== 'undefined') {
-      window.location.href = path;
-    }
+    if (onNavigate) { onNavigate(path); }
+    else if (typeof window !== 'undefined') { window.location.href = path; }
   }, [onNavigate]);
 
-    // Helper function to get entity name from i18n
   const getEntityName = (pluralName: string, form: 'single' | 'plural'): string => {
-    if (!schemaData) return `entity.${pluralName}.${form}`;
-    
-    // Get the proper entity type name from schema
-    const entityTypeName = getElementTypeNameOfListField(schemaData as SchemaData, pluralName);
-    if (!entityTypeName) return `entity.${pluralName}.${form}`;
-    
-    // Convert to lowercase for i18n key
     const baseName = entityTypeName.toLowerCase();
-    
     return `entity.${baseName}.${form}`;
   };
 
-  const { selection, columns, valueResolvers, entityTypeName, sortFieldByColumn, fieldTypeByColumn } = React.useMemo(() => {
-    const schema = schemaData as SchemaData | undefined;
-    if (!schema)
-      return {
-        selection: "id",
-        columns: ["id"],
-        valueResolvers: { id: (r: Record<string, unknown>) => r["id"] } as Record<string, ValueResolver>,
-        entityTypeName: listField,
-         sortFieldByColumn: {},
-         fieldTypeByColumn: {},
-      } as const;
-    const etn = getElementTypeNameOfListField(schema, listField);
-    if (!etn)
-      return {
-        selection: "id",
-        columns: ["id"],
-        valueResolvers: { id: (r: Record<string, unknown>) => r["id"] } as Record<string, ValueResolver>,
-        entityTypeName: listField,
-         sortFieldByColumn: {},
-         fieldTypeByColumn: {},
-      } as const;
-    return { ...buildSelectionSetForObjectType(schema, etn), entityTypeName: etn } as const;
-  }, [schemaData, listField]);
-
-  // Helper function to get field information including extensions
-  const getFieldInfo = React.useCallback((fieldName: string) => {
-    if (!schemaData || !entityTypeName) return null;
-    
-    const entityType = getTypeByName(schemaData as SchemaData, entityTypeName);
-    if (!entityType?.fields) return null;
-    
-    const field = entityType.fields.find(f => f.name === fieldName);
-    if (!field) return null;
-    
-    const fieldType = unwrapNamedType(field.type);
-    const isStateMachine = field.extensions?.stateMachine === true;
-    const isEnum = fieldType && schemaData.__schema.types.find((t: { name?: string; kind?: string }) => t.name === fieldType)?.kind === "ENUM";
-    
-    return {
-      field,
-      fieldType,
-      isStateMachine,
-      isEnum,
-      enumValues: isEnum && fieldType ? 
-        schemaData.__schema.types.find((t: { name?: string; enumValues?: Array<{ name: string }> }) => t.name === fieldType)?.enumValues?.map((ev: { name: string }) => ev.name) || [] 
-        : []
-    };
-  }, [schemaData, entityTypeName]);
-
-  // Helper function to render state machine field values
-  const renderStateMachineValue = React.useCallback((value: unknown, entityTypeName: string) => {
-    if (value == null) return "";
-    
-    const stateKey = `stateMachine.${entityTypeName.toLowerCase()}.state.${value}`;
-    return resolveLabel([stateKey], { entity: entityTypeName }, String(value));
-  }, [resolveLabel]);
-
   const [page, setPage] = React.useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = React.useState<number>(10);
-  const [rows, setRows] = React.useState<Row[]>([]);
-  const [totalCount, setTotalCount] = React.useState<number>(0);
-  const [loadingData, setLoadingData] = React.useState<boolean>(false);
-  const [errorData, setErrorData] = React.useState<string | null>(null);
   const [sortModel, setSortModel] = React.useState<{ field: string; sort: 'asc' | 'desc' }[]>([]);
   const [filterModel, setFilterModel] = React.useState<GridFilterModel>({ items: [] });
   const [pendingFilterModel, setPendingFilterModel] = React.useState<GridFilterModel>({ items: [] });
 
-  const filterBlock: string | null = React.useMemo(() => {
-    if (!filterModel?.items?.length) return null;
-    const byField = new Map<string, { operator: string; value: unknown }[]>();
-    for (const item of filterModel.items) {
-      if (!item.field || item.value == null || item.value === '') continue;
-      const field = String(item.field);
-      const opMap: Record<string, string> = {
-        contains: 'LIKE', startsWith: 'LIKE', endsWith: 'LIKE', equals: 'EQ', '=': 'EQ', is: 'EQ', '!=': 'NE', not: 'NE',
-        greaterThan: 'GT', '>': 'GT', greaterThanOrEqual: 'GTE', '>=': 'GTE', lessThan: 'LT', '<': 'LT', lessThanOrEqual: 'LTE', '<=': 'LTE',
-        isAnyOf: 'IN', in: 'IN', nin: 'NIN', btw: 'BTW'
-      };
-      const operator = opMap[item.operator ?? 'equals'] ?? 'EQ';
-      const value = item.value as unknown;
-      const arr = byField.get(field) ?? [];
-      arr.push({ operator, value });
-      byField.set(field, arr);
+  const filterItems = React.useMemo(() => gridFilterModelToFilterItems(filterModel), [filterModel]);
+
+  const sortTerms = React.useMemo(
+    () => sortModel.map(s => ({ field: s.field, order: (s.sort === 'asc' ? 'ASC' : 'DESC') as 'ASC' | 'DESC' })),
+    [sortModel]
+  );
+
+  const { data: rows, loading: loadingData, error: errorObj, totalCount } = useFind<Row>(
+    entityTypeName,
+    {
+      page,
+      size: rowsPerPage,
+      sort: sortTerms,
+      filters: filterItems,
+      fields: selection,
+      sortFieldByColumn,
+      fieldTypeByColumn,
     }
-    if (byField.size === 0) return null;
+  );
 
-    const parts: string[] = [];
-    byField.forEach((conds, col) => {
-      const sortField = (sortFieldByColumn as Record<string, string | undefined>)[col];
-      const isObjectColumn = sortField ? sortField.includes('.') : false;
-      const typeName = (fieldTypeByColumn as Record<string, string | undefined>)[col];
-      const isNumeric = isNumericScalarName(typeName);
-      const isBoolean = isBooleanScalarName(typeName);
-      const allowedOpsScalar = isNumeric ? new Set(["EQ","NE","GT","GTE","LT","LTE","IN","NIN","BTW"]) : isBoolean ? new Set(["EQ","NE"]) : new Set(["EQ","NE","LIKE","IN","NIN"]);
-      if (!isObjectColumn) {
-        const { operator, value } = conds[0];
-        if (!allowedOpsScalar.has(operator)) return;
-        const toLiteral = (v: unknown) => isNumeric ? String(Number(v)) : isBoolean ? String(Boolean(v)) : JSON.stringify(String(v));
-        if (operator === 'IN' || operator === 'NIN') {
-          const values = Array.isArray(value) ? value : [value];
-          const arrLit = `[${values.map(toLiteral).join(', ')}]`;
-          parts.push(`${col}: { operator: ${operator}, value: ${arrLit} }`);
-        } else if (operator === 'BTW') {
-          const values = Array.isArray(value) ? value : [value, value];
-          const arrLit = `[${values.slice(0,2).map(toLiteral).join(', ')}]`;
-          parts.push(`${col}: { operator: ${operator}, value: ${arrLit} }`);
-        } else {
-          const valueLiteral = toLiteral(value);
-          parts.push(`${col}: { operator: ${operator}, value: ${valueLiteral} }`);
-        }
-      } else {
-        const pathWithin = sortField!.split('.').slice(1).join('.');
-        const terms = conds.map(({ operator, value }) => {
-          const toLiteral = (v: unknown) => isNumeric ? String(Number(v)) : isBoolean ? String(Boolean(v)) : JSON.stringify(String(v));
-          if (operator === 'IN' || operator === 'NIN' || operator === 'BTW') {
-            const values = Array.isArray(value) ? value : [value];
-            const arrLit = operator === 'BTW' ? `[${values.slice(0,2).map(toLiteral).join(', ')}]` : `[${values.map(toLiteral).join(', ')}]`;
-            return `{ path: ${JSON.stringify(pathWithin)}, operator: ${operator}, value: ${arrLit} }`;
-          }
-          const valueLiteral = toLiteral(value);
-          return `{ path: ${JSON.stringify(pathWithin)}, operator: ${operator}, value: ${valueLiteral} }`;
-        }).join(', ');
-        parts.push(`${col}: { terms: [ ${terms} ] }`);
-      }
-    });
-    return parts.length ? parts.join(', ') : null;
-  }, [filterModel, sortFieldByColumn, fieldTypeByColumn]);
+  const errorData = errorObj?.message ?? null;
 
-  // URL state management
   const updateURL = React.useCallback((updates: {
     page?: number | null;
     size?: number | null;
@@ -219,70 +128,44 @@ function EntityTable({
     filter?: GridFilterModel | null;
   }) => {
     const params = new URLSearchParams(searchParams.toString());
-    
+
     if (updates.page !== undefined) {
-      if (updates.page === null || updates.page === 0) {
-        params.delete('page');
-      } else {
-        params.set('page', String(updates.page + 1)); // Convert to 1-based for URL
-      }
+      if (updates.page === null || updates.page === 0) params.delete('page');
+      else params.set('page', String(updates.page + 1));
     }
-    
     if (updates.size !== undefined) {
-      if (updates.size === null || updates.size === 10) {
-        params.delete('size');
-      } else {
-        params.set('size', String(updates.size));
-      }
+      if (updates.size === null || updates.size === 10) params.delete('size');
+      else params.set('size', String(updates.size));
     }
-    
     if (updates.sort !== undefined) {
-      if (updates.sort === null || updates.sort.length === 0) {
-        params.delete('sort');
-      } else {
-        const sortStr = updates.sort.map(s => `${s.field}:${s.sort}`).join(',');
-        params.set('sort', sortStr);
-      }
+      if (updates.sort === null || updates.sort.length === 0) params.delete('sort');
+      else params.set('sort', updates.sort.map(s => `${s.field}:${s.sort}`).join(','));
     }
-    
     if (updates.filter !== undefined) {
-      if (updates.filter === null || updates.filter.items.length === 0) {
-        params.delete('filter');
-      } else {
-        const filterStr = JSON.stringify(updates.filter);
-        params.set('filter', filterStr);
-      }
+      if (updates.filter === null || updates.filter.items.length === 0) params.delete('filter');
+      else params.set('filter', JSON.stringify(updates.filter));
     }
-    
-    if (onSearchParamsChange) {
-      onSearchParamsChange(params);
-    } else if (typeof window !== 'undefined') {
-      const newURL = `${window.location.pathname}?${params.toString()}`;
-      window.history.replaceState({}, '', newURL);
+
+    if (onSearchParamsChange) { onSearchParamsChange(params); }
+    else if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
     }
   }, [searchParamsString, onSearchParamsChange]);
 
-  // Initialize state from URL
   React.useEffect(() => {
     const pageParam = searchParams.get('page');
     const sizeParam = searchParams.get('size');
     const sortParam = searchParams.get('sort');
     const filterParam = searchParams.get('filter');
-    
+
     if (pageParam) {
       const pageNum = parseInt(pageParam, 10);
-      if (!isNaN(pageNum) && pageNum > 0) {
-        setPage(pageNum - 1); // Convert from 1-based to 0-based
-      }
+      if (!isNaN(pageNum) && pageNum > 0) setPage(pageNum - 1);
     }
-    
     if (sizeParam) {
       const sizeNum = parseInt(sizeParam, 10);
-      if (!isNaN(sizeNum) && [5, 10, 25, 50].includes(sizeNum)) {
-        setRowsPerPage(sizeNum);
-      }
+      if (!isNaN(sizeNum) && [5, 10, 25, 50].includes(sizeNum)) setRowsPerPage(sizeNum);
     }
-    
     if (sortParam) {
       try {
         const sortItems = sortParam.split(',').map(item => {
@@ -290,99 +173,21 @@ function EntityTable({
           return { field, sort: sort as 'asc' | 'desc' };
         });
         setSortModel(sortItems);
-      } catch {
-        console.warn('Invalid sort parameter:', sortParam);
-      }
+      } catch { /* skip invalid */ }
     }
-    
     if (filterParam) {
       try {
-        const filterModel = JSON.parse(filterParam);
-        setFilterModel(filterModel);
-        setPendingFilterModel(filterModel);
-      } catch {
-        console.warn('Invalid filter parameter:', filterParam);
-      }
+        const fm = JSON.parse(filterParam);
+        setFilterModel(fm);
+        setPendingFilterModel(fm);
+      } catch { /* skip invalid */ }
     }
   }, [searchParamsString]);
 
-  React.useEffect(() => {
-    if (!selection) return;
-    let cancelled = false;
-    setLoadingData(true);
-    setErrorData(null);
-    const hasSort = sortModel.length > 0;
-    const sortBlock = hasSort
-      ? (() => {
-          const terms = sortModel
-            .map((s) => {
-              const field = (sortFieldByColumn as Record<string, string | undefined>)[s.field] ?? s.field;
-              const order = s.sort === 'asc' ? 'ASC' : 'DESC';
-              return `{ field: "${field}", order: ${order} }`;
-            })
-            .join(', ');
-          return `sort: { terms: [ ${terms} ] }`;
-        })()
-      : null;
-    client
-      .query(
-        buildPaginatedListQuery(listField, selection, sortBlock, filterBlock),
-        {
-          page: page + 1,
-          size: rowsPerPage,
-          count: true,
-        },
-        {
-          requestPolicy: "network-only",
-        }
-      )
-      .toPromise()
-      .then((result) => {
-        console.log('result', result);
-        if (cancelled) return;
-        
-        if (result.error) {
-          setErrorData(result.error.message);
-          return;
-        }
-        
-        const raw = (result.data?.[listField] as unknown) as Row[] | undefined;
-        setRows(Array.isArray(raw) ? raw : []);
-        
-        // URQL automatically includes extensions in the response
-        const ext = result.extensions as Record<string, unknown> | undefined;
-        console.log('ext', ext);
-        const c = typeof ext?.count === "number" ? (ext.count as number) : null;
-        setTotalCount(c ?? 0);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setErrorData(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoadingData(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [client, listField, selection, page, rowsPerPage, sortModel, sortFieldByColumn, filterBlock]);
+  React.useEffect(() => { updateURL({ page, size: rowsPerPage }); }, [page, rowsPerPage, updateURL]);
+  React.useEffect(() => { updateURL({ sort: sortModel }); }, [sortModel, updateURL]);
+  React.useEffect(() => { updateURL({ filter: filterModel }); }, [filterModel, updateURL]);
 
-  // Update URL when state changes
-  React.useEffect(() => {
-    updateURL({ page, size: rowsPerPage });
-  }, [page, rowsPerPage, updateURL]);
-
-  React.useEffect(() => {
-    updateURL({ sort: sortModel });
-  }, [sortModel, updateURL]);
-
-  React.useEffect(() => {
-    updateURL({ filter: filterModel });
-  }, [filterModel, updateURL]);
-
-  const resolvedColumns = columns;
-  const entityNameForLabels = entityTypeName;
   const tableTitle = resolveLabel([getEntityName(listField, 'plural')], { entity: listField }, listField);
 
   type GridRow = Row & { __rid: string };
@@ -399,20 +204,12 @@ function EntityTable({
         return (
           <Stack direction="row" spacing={0.5}>
             <Tooltip title={resolveLabel(["actions.view"], { entity: listField }, "View")}>
-              <IconButton
-                size="small"
-                onClick={() => navigate(`/entities/${listField}/${entityId}/view`)}
-                color="primary"
-              >
+              <IconButton size="small" onClick={() => navigate(`/entities/${listField}/${entityId}/view`)} color="primary">
                 <VisibilityIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title={resolveLabel(["actions.edit"], { entity: listField }, "Edit")}>
-              <IconButton
-                size="small"
-                onClick={() => navigate(`/entities/${listField}/${entityId}/edit`)}
-                color="primary"
-              >
+              <IconButton size="small" onClick={() => navigate(`/entities/${listField}/${entityId}/edit`)} color="primary">
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -422,11 +219,11 @@ function EntityTable({
     };
 
     const dataColumns = resolvedColumns.map((col) => {
-      const header = resolveLabel([`${entityNameForLabels.toLowerCase()}.${col}`], { entity: entityNameForLabels, field: col }, col);
-      const typeName = (fieldTypeByColumn as Record<string, string | undefined>)[col];
-      const isNumeric = isNumericScalarName(typeName);
-      const isBoolean = isBooleanScalarName(typeName);
-      const isDate = isDateTimeScalarName(typeName);
+      const header = resolveLabel([`${entityTypeName.toLowerCase()}.${col}`], { entity: entityTypeName, field: col }, col);
+      const typeName = fieldTypeByColumn[col];
+      const isNumeric = client.isNumericScalar(typeName);
+      const isBoolean = client.isBooleanScalar(typeName);
+      const isDate = client.isDateTimeScalar(typeName);
       const def: GridColDef<GridRow> = {
         field: col,
         headerName: header,
@@ -436,26 +233,17 @@ function EntityTable({
         headerAlign: 'left',
         align: 'left',
         filterOperators: (() => {
-          // Check if this is a state machine field
           const fieldInfo = getFieldInfo(col);
-          if (fieldInfo?.isStateMachine && fieldInfo.isEnum) {
-            // State machine fields: only equals operator with select dropdown
+          if (fieldInfo.isStateMachine && fieldInfo.isEnum) {
             return [
-              { 
-                label: '=', 
-                value: 'equals', 
-                getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], 
+              {
+                label: '=', value: 'equals',
+                getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'],
                 InputComponent: StateMachineFilterInput,
-                InputComponentProps: { 
-                  entityTypeName: entityNameForLabels,
-                  fieldName: col,
-                  enumValues: fieldInfo.enumValues,
-                  resolveLabel
-                } 
+                InputComponentProps: { entityTypeName, fieldName: col, enumValues: fieldInfo.enumValues, resolveLabel },
               } as unknown as GridFilterOperator,
             ];
           }
-          
           if (isNumeric) {
             const base = getGridNumericOperators();
             const keep = new Set(['=', '!=', '>', '>=', '<', '<=', 'equals']);
@@ -466,11 +254,8 @@ function EntityTable({
               { label: resolveLabel(['grid.filter.notIn'], { entity: listField }, 'not in'), value: 'nin', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: TagsFilterInput } as unknown as GridFilterOperator,
             ];
           }
-          if (isBoolean) {
-            return getGridBooleanOperators();
-          }
+          if (isBoolean) return getGridBooleanOperators();
           if (isDate) {
-            // Symbols for labels, same set as numbers, plus between; no IN/NIN
             return [
               { label: '=', value: 'equals', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: DateFilterInput, InputComponentProps: { inputType: 'datetime-local' } } as unknown as GridFilterOperator,
               { label: '!=', value: '!=', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: DateFilterInput, InputComponentProps: { inputType: 'datetime-local' } } as unknown as GridFilterOperator,
@@ -481,7 +266,6 @@ function EntityTable({
               { label: resolveLabel(['grid.filter.between'], { entity: listField }, 'between'), value: 'btw', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: BetweenFilterInput, InputComponentProps: { inputType: 'datetime-local' } } as unknown as GridFilterOperator,
             ];
           }
-          // Strings: only contains, equals, not equal ("!="), in, nin; symbols for equals/!=
           return [
             { label: resolveLabel(['grid.filter.contains'], { entity: listField }, 'contains'), value: 'contains', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: GridFilterInputValue } as unknown as GridFilterOperator,
             { label: '=', value: 'equals', getApplyFilterFn: undefined as unknown as GridFilterOperator['getApplyFilterFn'], InputComponent: GridFilterInputValue } as unknown as GridFilterOperator,
@@ -504,26 +288,18 @@ function EntityTable({
           const resolver = (valueResolvers as Record<string, ValueResolver | undefined>)[col];
           const value = resolver ? resolver(row) : (row as Record<string, unknown>)[col];
 
-          // Check if this is a state machine field
           const fieldInfo = getFieldInfo(col);
-          if (fieldInfo?.isStateMachine) {
-            const internationalizedValue = renderStateMachineValue(value, entityNameForLabels);
+          if (fieldInfo.isStateMachine) {
+            const internationalizedValue = renderStateMachineValue(value, entityTypeName);
             return <span>{internationalizedValue}</span>;
           }
 
-          // Custom renderer resolution by ordered keys:
-          // 1) entity.field  2) field  3) entity
-          const key1 = `${entityNameForLabels}.${col}`;
+          const key1 = `${entityTypeName}.${col}`;
           const key2 = col;
-          const key3 = entityNameForLabels;
-          const renderer =
-            resolveColumnRenderer(key1) ||
-            resolveColumnRenderer(key2) ||
-            resolveColumnRenderer(key3);
+          const key3 = entityTypeName;
+          const renderer = resolveColumnRenderer(key1) || resolveColumnRenderer(key2) || resolveColumnRenderer(key3);
           if (renderer) {
-            return (
-              <>{renderer({ entity: entityNameForLabels, field: col, row, value, gridParams: params })}</>
-            );
+            return <>{renderer({ entity: entityTypeName, field: col, row, value, gridParams: params })}</>;
           }
           return <span>{String(value ?? "")}</span>;
         },
@@ -532,10 +308,10 @@ function EntityTable({
     });
 
     return [actionColumn, ...dataColumns];
-  }, [resolvedColumns, resolveLabel, entityNameForLabels, valueResolvers, fieldTypeByColumn, listField, getFieldInfo, renderStateMachineValue, locale]);
+  }, [resolvedColumns, resolveLabel, entityTypeName, valueResolvers, fieldTypeByColumn, listField, getFieldInfo, renderStateMachineValue, locale, client]);
 
   const gridRows: GridRow[] = React.useMemo(() => {
-    return rows.map((row, idx) => ({ __rid: String((row as Record<string, unknown>)["id"] ?? `${listField}-${page}-${idx}`), ...row }));
+    return (rows ?? []).map((row, idx) => ({ __rid: String((row as Record<string, unknown>)["id"] ?? `${listField}-${page}-${idx}`), ...row }));
   }, [rows, listField, page]);
 
   const PaginationComponent = React.useMemo(
@@ -546,10 +322,7 @@ function EntityTable({
         page={page}
         rowsPerPage={rowsPerPage}
         onPageChange={(_, newPage) => setPage(newPage)}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value, 10));
-          setPage(0);
-        }}
+        onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
         rowsPerPageOptions={[5, 10, 25, 50]}
         labelRowsPerPage={resolveLabel(['grid.pagination.rowsPerPage'], { entity: listField }, 'Rows per page:')}
         labelDisplayedRows={({ from, to, count }: { from: number; to: number; count: number }) => {
@@ -564,7 +337,6 @@ function EntityTable({
   const localeText = React.useMemo(() => {
     const t = (k: string, d: string) => resolveLabel([`grid.${k}`], { entity: listField }, d);
     return {
-      // Filter panel
       filterPanelColumns: t('filter.columns', 'Columns'),
       filterPanelOperator: t('filter.operator', 'Operator'),
       filterPanelValue: t('filter.value', 'Value'),
@@ -579,7 +351,6 @@ function EntityTable({
       filterOperatorGreaterThanOrEqual: t('filter.greaterThanOrEqual', 'greater than or equal to'),
       filterOperatorLessThan: t('filter.lessThan', 'less than'),
       filterOperatorLessThanOrEqual: t('filter.lessThanOrEqual', 'less than or equal to'),
-      // Column menu
       columnMenuSortAsc: t('columnMenu.sortAsc', 'Sort by ASC'),
       columnMenuSortDesc: t('columnMenu.sortDesc', 'Sort by DESC'),
       columnMenuFilter: t('columnMenu.filter', 'Filter'),
@@ -587,11 +358,7 @@ function EntityTable({
       columnMenuManageColumns: t('columnMenu.manageColumns', 'Manage columns'),
       columnMenuShowColumns: t('columnMenu.showColumns', 'Show columns'),
       columnMenuUnsort: t('columnMenu.unsort', 'Unsort'),
-      // Input Label
       filterPanelInputLabel: t('filterPanel.inputLabel', 'Value'),
-     
-
-      // Footer
       footerRowSelected: (count: number) =>
         count !== 1
           ? t('footer.rowsSelected', `${count.toLocaleString()} rows selected`)
@@ -602,15 +369,9 @@ function EntityTable({
   return (
     <Box sx={{ p: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h5">
-          {tableTitle}
-        </Typography>
+        <Typography variant="h5">{tableTitle}</Typography>
         <Tooltip title={`${resolveLabel(["button.create"], { entity: listField }, "Create")} ${resolveLabel([getEntityName(listField, 'plural')], { entity: listField }, listField)}`}>
-          <IconButton
-            color="primary"
-            size="large"
-            onClick={() => navigate(`/entities/${listField}/create`)}
-          >
+          <IconButton color="primary" size="large" onClick={() => navigate(`/entities/${listField}/create`)}>
             <AddCircleIcon fontSize="large" />
           </IconButton>
         </Tooltip>
@@ -622,9 +383,7 @@ function EntityTable({
         </Box>
       )}
       {errorData && (
-        <Typography color="error" variant="body2">
-          Failed to load data: {errorData}
-        </Typography>
+        <Typography color="error" variant="body2">Failed to load data: {errorData}</Typography>
       )}
       {!loadingData && !errorData && (
         <Paper sx={{ width: "100%", p: 0, minWidth: 0 }}>
@@ -640,12 +399,8 @@ function EntityTable({
             paginationMode="server"
             paginationModel={{ page, pageSize: rowsPerPage } as GridPaginationModel}
             onPaginationModelChange={(model) => {
-              if (model.pageSize !== rowsPerPage) {
-                setRowsPerPage(model.pageSize);
-                setPage(0);
-              } else if (model.page !== page) {
-                setPage(model.page);
-              }
+              if (model.pageSize !== rowsPerPage) { setRowsPerPage(model.pageSize); setPage(0); }
+              else if (model.page !== page) { setPage(model.page); }
             }}
             sortingMode="server"
             sortModel={sortModel}
@@ -665,13 +420,8 @@ function EntityTable({
                   filterModel={pendingFilterModel}
                   onFilterModelChange={setPendingFilterModel}
                   onApply={() => setFilterModel(pendingFilterModel)}
-                  onClear={() => { 
-                    setPendingFilterModel({ items: [] }); 
-                    setFilterModel({ items: [] }); 
-                    updateURL({ filter: null });
-                  }}
+                  onClear={() => { setPendingFilterModel({ items: [] }); setFilterModel({ items: [] }); updateURL({ filter: null }); }}
                   onOpenFilter={() => {
-                    // Directly call the grid API when possible
                     const root = document.querySelector('[data-mui-internal="GridRoot"]') || document.querySelector('[role="grid"]');
                     if (root) {
                       const toggleBtn = root.querySelector('[aria-label="Filters"]') || root.querySelector('[aria-label="Show filters"]') || root.querySelector('[aria-label="Hide filters"]');
@@ -683,14 +433,10 @@ function EntityTable({
               filterPanel: () => (
                 <ServerFilterPanel
                   onApply={(model) => setFilterModel(model)}
-                  onClear={() => { 
-                    setPendingFilterModel({ items: [] }); 
-                    setFilterModel({ items: [] }); 
-                    updateURL({ filter: null });
-                  }}
+                  onClear={() => { setPendingFilterModel({ items: [] }); setFilterModel({ items: [] }); updateURL({ filter: null }); }}
                 />
               ),
-              pagination: PaginationComponent,  
+              pagination: PaginationComponent,
             }}
             disableRowSelectionOnClick
             sx={{ border: 0 }}
