@@ -78,7 +78,7 @@
   },
   "homepage": "https://github.com/simtlix/simfinity-fe-components#readme",
   "dependencies": {
-    "@simtlix/simfinity-js-client": "file:../GitHub/simfinity-js-client/simtlix-simfinity-js-client-1.0.0.tgz",
+    "@simtlix/simfinity-js-client": "^1.0.1",
     "@types/classnames": "^2.3.0",
     "classnames": "^2.5.1"
   }
