@@ -71,6 +71,7 @@ declare module "@simtlix/simfinity-js-client" {
     fields(selectionString: string): this;
     page(page: number, size: number, count?: boolean): this;
     sort(field: string, order: "ASC" | "DESC"): this;
+    clearSort(): this;
     autoSelect(): this;
     exec(): Promise<unknown>;
     execWithMeta(): Promise<ExecWithMetaResult>;

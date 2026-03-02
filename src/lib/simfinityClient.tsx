@@ -327,7 +327,7 @@ export function useFindByParent<T = Record<string, unknown>>(
 
     const parsedSort: SortTerm[] = JSON.parse(sortJson);
     if (parsedSort.length > 0) {
-      // Clear the default sort from findByParent before adding custom sorts
+      builder.clearSort();
       for (const s of parsedSort) {
         const resolvedField = sortFieldByColumn?.[s.field] ?? s.field;
         builder.sort(resolvedField, s.order);
