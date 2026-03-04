@@ -61,6 +61,18 @@ function MyApp() {
 
 `SimfinityClientProvider` initializes the `SimfinityClient`, performs a single introspection query against the Simfinity backend, and makes the client available to all child components via React context.
 
+You can customize the loading and error states:
+
+```tsx
+<SimfinityClientProvider
+  endpoint="http://localhost:3000/graphql"
+  loadingFallback={<MyCustomSpinner />}
+  errorFallback={(error) => <MyErrorPage message={error.message} />}
+>
+  {/* ... */}
+</SimfinityClientProvider>
+```
+
 ### Next.js Integration
 
 ```tsx
@@ -612,6 +624,8 @@ import {
 |------|------|----------|-------------|
 | `endpoint` | `string` | Yes | Simfinity GraphQL endpoint URL |
 | `children` | `React.ReactNode` | Yes | Child components |
+| `loadingFallback` | `React.ReactNode` | No | Custom UI to display while the client initializes |
+| `errorFallback` | `(error: Error) => React.ReactNode` | No | Render function for custom error UI on initialization failure |
 
 ## Getting Started Guide
 

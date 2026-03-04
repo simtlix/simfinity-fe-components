@@ -11,9 +11,11 @@ const SimfinityClientContext = React.createContext<SimfinityClient | null>(null)
 export type SimfinityClientProviderProps = {
   endpoint: string;
   children: React.ReactNode;
+  loadingFallback?: React.ReactNode;
+  errorFallback?: (error: Error) => React.ReactNode;
 };
 
-export function SimfinityClientProvider({ endpoint, children }: SimfinityClientProviderProps) {
+export function SimfinityClientProvider({ endpoint, children, loadingFallback, errorFallback }: SimfinityClientProviderProps) {
   const [client, setClient] = React.useState<SimfinityClient | null>(null);
   const [initError, setInitError] = React.useState<Error | null>(null);
 
@@ -27,19 +29,19 @@ export function SimfinityClientProvider({ endpoint, children }: SimfinityClientP
   }, [endpoint]);
 
   if (initError) {
-    return (
+    return <>{errorFallback ? errorFallback(initError) : (
       <div style={{ padding: 24, color: "red" }}>
         SimfinityClient initialization failed: {initError.message}
       </div>
-    );
+    )}</>;
   }
 
   if (!client) {
-    return (
+    return <>{loadingFallback ?? (
       <div style={{ padding: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
         Initializing...
       </div>
-    );
+    )}</>;
   }
 
   return (
