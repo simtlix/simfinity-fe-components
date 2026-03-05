@@ -216,6 +216,24 @@ export type CollectionFieldCustomization = {
     parentEntityId: string | null,
     isEditMode: boolean
   ) => React.ReactElement;
+  // Callback for when an item is restored/reverted/removed from pending changes
+  // status indicates the operation: 'deleted' = un-delete, 'modified' = revert, 'added' = remove new
+  onRestore?: (
+    item: Record<string, unknown>,
+    status: 'deleted' | 'modified' | 'added',
+    setMessage: (message: FormMessage) => void
+  ) => boolean | void | Promise<boolean | void>;
+  // Callback before the edit dialog is shown; return false to prevent opening
+  onBeforeEdit?: (
+    item: Record<string, unknown>,
+    setMessage: (message: FormMessage) => void,
+    parentFormData: Record<string, unknown>
+  ) => boolean | void | Promise<boolean | void>;
+  // Callback before the create dialog is shown; return false to prevent opening
+  onBeforeCreate?: (
+    setMessage: (message: FormMessage) => void,
+    parentFormData: Record<string, unknown>
+  ) => boolean | void | Promise<boolean | void>;
   // Mode-specific customizations for collection items
   onEdit?: CollectionItemModeCustomization;    // Edit mode customizations for collection item fields
   onCreate?: CollectionItemModeCustomization;  // Create mode customizations for collection item fields
@@ -505,7 +523,7 @@ export function getEmbeddedFieldSize(
 
 // Type guard for collection field customization
 function isCollectionFieldCustomization(value: unknown): value is CollectionFieldCustomization {
-  return typeof value === 'object' && value !== null && ('items' in value || 'customCollectionRenderer' in value || 'onDelete' in value || 'onEdit' in value || 'onCreate' in value);
+  return typeof value === 'object' && value !== null && ('items' in value || 'customCollectionRenderer' in value || 'onDelete' in value || 'onRestore' in value || 'onBeforeEdit' in value || 'onBeforeCreate' in value || 'onEdit' in value || 'onCreate' in value);
 }
 
 // Helper function to get collection field customization
@@ -640,4 +658,31 @@ export function getCollectionOnDelete(
 ): CollectionFieldCustomization['onDelete'] | undefined {
   const collectionCustomization = getCollectionFieldCustomization(customization, collectionFieldName);
   return collectionCustomization?.onDelete;
+}
+
+// Helper function to get collection onRestore callback
+export function getCollectionOnRestore(
+  customization: FormCustomization,
+  collectionFieldName: string
+): CollectionFieldCustomization['onRestore'] | undefined {
+  const collectionCustomization = getCollectionFieldCustomization(customization, collectionFieldName);
+  return collectionCustomization?.onRestore;
+}
+
+// Helper function to get collection onBeforeEdit callback
+export function getCollectionOnBeforeEdit(
+  customization: FormCustomization,
+  collectionFieldName: string
+): CollectionFieldCustomization['onBeforeEdit'] | undefined {
+  const collectionCustomization = getCollectionFieldCustomization(customization, collectionFieldName);
+  return collectionCustomization?.onBeforeEdit;
+}
+
+// Helper function to get collection onBeforeCreate callback
+export function getCollectionOnBeforeCreate(
+  customization: FormCustomization,
+  collectionFieldName: string
+): CollectionFieldCustomization['onBeforeCreate'] | undefined {
+  const collectionCustomization = getCollectionFieldCustomization(customization, collectionFieldName);
+  return collectionCustomization?.onBeforeCreate;
 }

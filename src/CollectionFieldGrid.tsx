@@ -28,7 +28,7 @@ import AddCircleIcon from "@mui/icons-material/AddCircle";
 import { resolveColumnRenderer } from "./lib/columnRenderers";
 import { useI18n } from "./lib/i18n";
 import CollectionItemEditForm from "./CollectionItemEditForm";
-import { getFormCustomization, getCollectionOnDelete, FormMessage, ParentFormAccess } from "./lib/formCustomization";
+import { getFormCustomization, getCollectionOnDelete, getCollectionOnRestore, getCollectionOnBeforeEdit, getCollectionOnBeforeCreate, FormMessage, ParentFormAccess } from "./lib/formCustomization";
 import { useSimfinityClient, useFindByParent, buildValueResolvers } from "./lib/simfinityClient";
 
 export type CollectionItemStatus = 'original' | 'added' | 'modified' | 'deleted';
@@ -175,12 +175,22 @@ export default function CollectionFieldGrid({
     });
   }, [collectionItems, columns, valueResolvers]);
 
-  const handleEditItem = React.useCallback((item: Record<string, unknown>) => {
+  const handleEditItem = React.useCallback(async (item: Record<string, unknown>) => {
+    const parentCustomization = getFormCustomization(parentEntityType, "edit");
+    const onBeforeEditCallback = getCollectionOnBeforeEdit(parentCustomization || {}, collectionField.name);
+
+    if (onBeforeEditCallback) {
+      try {
+        const shouldContinue = await onBeforeEditCallback(item, setMessage, parentFormAccess?.parentFormData || {});
+        if (shouldContinue === false) return;
+      } catch { return; }
+    }
+
     const originalData = item.__originalData as Record<string, unknown>;
     setEditingItem((originalData || item) as CollectionItem);
     setIsAddingNew(false);
     setEditFormOpen(true);
-  }, []);
+  }, [parentEntityType, collectionField.name, parentFormAccess?.parentFormData]);
 
   const handleDeleteItem = React.useCallback(async (item: Record<string, unknown>) => {
     const parentCustomization = getFormCustomization(parentEntityType, "edit");
@@ -194,6 +204,13 @@ export default function CollectionFieldGrid({
     }
 
     if (currentState.added.some(i => i.id === item.id)) {
+      const onRestoreCallback = getCollectionOnRestore(parentCustomization || {}, collectionField.name);
+      if (onRestoreCallback) {
+        try {
+          const shouldContinue = await onRestoreCallback(item, 'added', setMessage);
+          if (shouldContinue === false) return;
+        } catch { return; }
+      }
       setCurrentState(prev => ({ ...prev, added: prev.added.filter(i => i.id !== item.id) }));
       return;
     }
@@ -214,15 +231,38 @@ export default function CollectionFieldGrid({
     }));
   }, [currentState.added, currentState.modified, setCurrentState, parentEntityType, collectionField.name]);
 
-  const handleRestoreItem = React.useCallback((item: CollectionItem) => {
-    if (item.__status === 'deleted') {
+  const handleRestoreItem = React.useCallback(async (item: CollectionItem) => {
+    const status = item.__status as 'deleted' | 'modified';
+    if (!status || (status !== 'deleted' && status !== 'modified')) return;
+
+    const parentCustomization = getFormCustomization(parentEntityType, "edit");
+    const onRestoreCallback = getCollectionOnRestore(parentCustomization || {}, collectionField.name);
+
+    if (onRestoreCallback) {
+      try {
+        const shouldContinue = await onRestoreCallback(item, status, setMessage);
+        if (shouldContinue === false) return;
+      } catch { return; }
+    }
+
+    if (status === 'deleted') {
       setCurrentState(prev => ({ ...prev, deleted: prev.deleted.filter(i => i.id !== item.id) }));
-    } else if (item.__status === 'modified') {
+    } else if (status === 'modified') {
       setCurrentState(prev => ({ ...prev, modified: prev.modified.filter(i => i.id !== item.id) }));
     }
-  }, [setCurrentState]);
+  }, [setCurrentState, parentEntityType, collectionField.name]);
 
-  const handleAddItem = React.useCallback(() => {
+  const handleAddItem = React.useCallback(async () => {
+    const parentCustomization = getFormCustomization(parentEntityType, "edit");
+    const onBeforeCreateCallback = getCollectionOnBeforeCreate(parentCustomization || {}, collectionField.name);
+
+    if (onBeforeCreateCallback) {
+      try {
+        const shouldContinue = await onBeforeCreateCallback(setMessage, parentFormAccess?.parentFormData || {});
+        if (shouldContinue === false) return;
+      } catch { return; }
+    }
+
     const newItem: CollectionItem = {
       id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       __status: 'added',
@@ -231,7 +271,7 @@ export default function CollectionFieldGrid({
     setEditingItem(newItem);
     setIsAddingNew(true);
     setEditFormOpen(true);
-  }, [displayColumns]);
+  }, [displayColumns, parentEntityType, collectionField.name, parentFormAccess?.parentFormData]);
 
   const handleSaveEditedItem = React.useCallback((updatedItem: CollectionItem) => {
     if (isAddingNew) {

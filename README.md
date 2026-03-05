@@ -310,6 +310,16 @@ registerFormCustomization('Serie', 'edit', {
       onDelete: async (item, setMessage) => {
         return true; // confirm deletion
       },
+      onRestore: async (item, status, setMessage) => {
+        // status: 'deleted' (un-delete), 'modified' (revert), 'added' (remove new)
+        return true; // return false to prevent the restore/revert/remove
+      },
+      onBeforeEdit: async (item, setMessage, parentFormData) => {
+        return true; // return false to prevent the edit dialog from opening
+      },
+      onBeforeCreate: async (setMessage, parentFormData) => {
+        return true; // return false to prevent the create dialog from opening
+      },
       onEdit: {
         fieldsCustomization: { number: { enabled: false } },
         onSubmit: async (item, setFieldData, formData) => true,
