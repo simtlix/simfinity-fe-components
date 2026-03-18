@@ -7,7 +7,9 @@ import { TagsFilterInput, BetweenFilterInput, DateFilterInput, StateMachineFilte
 import type { ValueResolver } from "./lib/introspection";
 import { resolveColumnRenderer } from "./lib/columnRenderers";
 import { useI18n } from "./lib/i18n";
-import { useSimfinityClient, useFind, buildValueResolvers, type FilterItem } from "./lib/simfinityClient";
+import { useSimfinityClient, useFind, buildValueResolvers } from "./lib/simfinityClient";
+import { gridFilterModelToFilterItems } from "./lib/filterUtils";
+import { useEntityListState } from "./hooks/useEntityListState";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
@@ -18,24 +20,6 @@ type EntityTableProps = {
   getSearchParams?: () => URLSearchParams;
   onSearchParamsChange?: (params: URLSearchParams) => void;
 };
-
-const OPERATOR_MAP: Record<string, string> = {
-  contains: 'LIKE', startsWith: 'LIKE', endsWith: 'LIKE', equals: 'EQ', '=': 'EQ', is: 'EQ',
-  '!=': 'NE', not: 'NE', greaterThan: 'GT', '>': 'GT', greaterThanOrEqual: 'GTE', '>=': 'GTE',
-  lessThan: 'LT', '<': 'LT', lessThanOrEqual: 'LTE', '<=': 'LTE',
-  isAnyOf: 'IN', in: 'IN', nin: 'NIN', btw: 'BTW',
-};
-
-function gridFilterModelToFilterItems(model: GridFilterModel): FilterItem[] {
-  if (!model?.items?.length) return [];
-  const items: FilterItem[] = [];
-  for (const item of model.items) {
-    if (!item.field || item.value == null || item.value === '') continue;
-    const operator = OPERATOR_MAP[item.operator ?? 'equals'] ?? 'EQ';
-    items.push({ field: String(item.field), operator, value: item.value });
-  }
-  return items;
-}
 
 type Row = Record<string, unknown>;
 
@@ -75,14 +59,6 @@ function EntityTable({
     return resolveLabel([stateKey], { entity: etn }, String(value));
   }, [resolveLabel]);
 
-  const searchParams = React.useMemo(() => {
-    if (getSearchParams) return getSearchParams();
-    if (typeof window !== 'undefined') return new URLSearchParams(window.location.search);
-    return new URLSearchParams();
-  }, [getSearchParams]);
-
-  const searchParamsString = React.useMemo(() => searchParams.toString(), [searchParams]);
-
   const navigate = React.useCallback((path: string) => {
     if (onNavigate) { onNavigate(path); }
     else if (typeof window !== 'undefined') { window.location.href = path; }
@@ -93,17 +69,39 @@ function EntityTable({
     return `entity.${baseName}.${form}`;
   };
 
-  const [page, setPage] = React.useState<number>(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState<number>(10);
-  const [sortModel, setSortModel] = React.useState<{ field: string; sort: 'asc' | 'desc' }[]>([]);
-  const [filterModel, setFilterModel] = React.useState<GridFilterModel>({ items: [] });
-  const [pendingFilterModel, setPendingFilterModel] = React.useState<GridFilterModel>({ items: [] });
+  const {
+    page,
+    setPage,
+    rowsPerPage,
+    setRowsPerPage,
+    sortModel,
+    setSortModel,
+    filterModel,
+    setFilterModel,
+    pendingFilterModel,
+    setPendingFilterModel,
+    filterItems,
+    sortTerms,
+    updateURL,
+  } = useEntityListState({ getSearchParams, onSearchParamsChange });
 
-  const filterItems = React.useMemo(() => gridFilterModelToFilterItems(filterModel), [filterModel]);
+  const buildReturnTo = React.useCallback(() => {
+    const params = new URLSearchParams();
+    if (page > 0) params.set('page', String(page + 1));
+    if (rowsPerPage !== 10) params.set('size', String(rowsPerPage));
+    if (sortModel.length > 0) params.set('sort', sortModel.map((s) => `${s.field}:${s.sort}`).join(','));
+    if (filterModel.items.length > 0) params.set('filter', JSON.stringify(filterModel));
+    const qs = params.toString();
+    return `/entities/${listField}${qs ? `?${qs}` : ''}`;
+  }, [listField, page, rowsPerPage, sortModel, filterModel]);
 
-  const sortTerms = React.useMemo(
-    () => sortModel.map(s => ({ field: s.field, order: (s.sort === 'asc' ? 'ASC' : 'DESC') as 'ASC' | 'DESC' })),
-    [sortModel]
+  const navigateToForm = React.useCallback(
+    (path: string) => {
+      const returnTo = buildReturnTo();
+      const sep = path.includes('?') ? '&' : '?';
+      navigate(`${path}${sep}returnTo=${encodeURIComponent(returnTo)}`);
+    },
+    [buildReturnTo, navigate]
   );
 
   const { data: rows, loading: loadingData, error: errorObj, totalCount } = useFind<Row>(
@@ -121,73 +119,6 @@ function EntityTable({
 
   const errorData = errorObj?.message ?? null;
 
-  const updateURL = React.useCallback((updates: {
-    page?: number | null;
-    size?: number | null;
-    sort?: { field: string; sort: 'asc' | 'desc' }[] | null;
-    filter?: GridFilterModel | null;
-  }) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (updates.page !== undefined) {
-      if (updates.page === null || updates.page === 0) params.delete('page');
-      else params.set('page', String(updates.page + 1));
-    }
-    if (updates.size !== undefined) {
-      if (updates.size === null || updates.size === 10) params.delete('size');
-      else params.set('size', String(updates.size));
-    }
-    if (updates.sort !== undefined) {
-      if (updates.sort === null || updates.sort.length === 0) params.delete('sort');
-      else params.set('sort', updates.sort.map(s => `${s.field}:${s.sort}`).join(','));
-    }
-    if (updates.filter !== undefined) {
-      if (updates.filter === null || updates.filter.items.length === 0) params.delete('filter');
-      else params.set('filter', JSON.stringify(updates.filter));
-    }
-
-    if (onSearchParamsChange) { onSearchParamsChange(params); }
-    else if (typeof window !== 'undefined') {
-      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-    }
-  }, [searchParamsString, onSearchParamsChange]);
-
-  React.useEffect(() => {
-    const pageParam = searchParams.get('page');
-    const sizeParam = searchParams.get('size');
-    const sortParam = searchParams.get('sort');
-    const filterParam = searchParams.get('filter');
-
-    if (pageParam) {
-      const pageNum = parseInt(pageParam, 10);
-      if (!isNaN(pageNum) && pageNum > 0) setPage(pageNum - 1);
-    }
-    if (sizeParam) {
-      const sizeNum = parseInt(sizeParam, 10);
-      if (!isNaN(sizeNum) && [5, 10, 25, 50].includes(sizeNum)) setRowsPerPage(sizeNum);
-    }
-    if (sortParam) {
-      try {
-        const sortItems = sortParam.split(',').map(item => {
-          const [field, sort] = item.split(':');
-          return { field, sort: sort as 'asc' | 'desc' };
-        });
-        setSortModel(sortItems);
-      } catch { /* skip invalid */ }
-    }
-    if (filterParam) {
-      try {
-        const fm = JSON.parse(filterParam);
-        setFilterModel(fm);
-        setPendingFilterModel(fm);
-      } catch { /* skip invalid */ }
-    }
-  }, [searchParamsString]);
-
-  React.useEffect(() => { updateURL({ page, size: rowsPerPage }); }, [page, rowsPerPage, updateURL]);
-  React.useEffect(() => { updateURL({ sort: sortModel }); }, [sortModel, updateURL]);
-  React.useEffect(() => { updateURL({ filter: filterModel }); }, [filterModel, updateURL]);
-
   const tableTitle = resolveLabel([getEntityName(listField, 'plural')], { entity: listField }, listField);
 
   type GridRow = Row & { __rid: string };
@@ -204,12 +135,12 @@ function EntityTable({
         return (
           <Stack direction="row" spacing={0.5}>
             <Tooltip title={resolveLabel(["actions.view"], { entity: listField }, "View")}>
-              <IconButton size="small" onClick={() => navigate(`/entities/${listField}/${entityId}/view`)} color="primary">
+              <IconButton size="small" onClick={() => navigateToForm(`/entities/${listField}/${entityId}/view`)} color="primary">
                 <VisibilityIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title={resolveLabel(["actions.edit"], { entity: listField }, "Edit")}>
-              <IconButton size="small" onClick={() => navigate(`/entities/${listField}/${entityId}/edit`)} color="primary">
+              <IconButton size="small" onClick={() => navigateToForm(`/entities/${listField}/${entityId}/edit`)} color="primary">
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -308,7 +239,7 @@ function EntityTable({
     });
 
     return [actionColumn, ...dataColumns];
-  }, [resolvedColumns, resolveLabel, entityTypeName, valueResolvers, fieldTypeByColumn, listField, getFieldInfo, renderStateMachineValue, locale, client]);
+  }, [resolvedColumns, resolveLabel, entityTypeName, valueResolvers, fieldTypeByColumn, listField, getFieldInfo, renderStateMachineValue, locale, client, navigateToForm]);
 
   const gridRows: GridRow[] = React.useMemo(() => {
     return (rows ?? []).map((row, idx) => ({ __rid: String((row as Record<string, unknown>)["id"] ?? `${listField}-${page}-${idx}`), ...row }));
@@ -371,7 +302,7 @@ function EntityTable({
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5">{tableTitle}</Typography>
         <Tooltip title={`${resolveLabel(["button.create"], { entity: listField }, "Create")} ${resolveLabel([getEntityName(listField, 'plural')], { entity: listField }, listField)}`}>
-          <IconButton color="primary" size="large" onClick={() => navigate(`/entities/${listField}/create`)}>
+          <IconButton color="primary" size="large" onClick={() => navigateToForm(`/entities/${listField}/create`)}>
             <AddCircleIcon fontSize="large" />
           </IconButton>
         </Tooltip>

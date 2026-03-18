@@ -3,6 +3,45 @@ import { Autocomplete, Chip, TextField, Stack, FormControl, InputLabel, Select, 
 import type { GridFilterInputValueProps } from "@mui/x-data-grid";
 import { useI18n } from "./lib/i18n";
 
+/** Standalone text/number filter input - does NOT require DataGrid context (unlike GridFilterInputValue). */
+export function TextFilterInput(props: GridFilterInputValueProps & { inputType?: string }) {
+  const { item, applyValue, inputType = "text" } = props;
+  const value = (item.value ?? "") as string | number;
+  return (
+    <TextField
+      size="small"
+      type={inputType}
+      value={value as string}
+      onChange={(e) => applyValue({ ...item, value: e.target.value })}
+      fullWidth
+    />
+  );
+}
+
+/** Standalone boolean filter input - does NOT require DataGrid context. */
+export function BooleanFilterInput(props: GridFilterInputValueProps) {
+  const { item, applyValue } = props;
+  const raw = item.value;
+  const displayValue =
+    raw === "" || raw == null ? "" : raw === true || String(raw) === "true" ? "true" : "false";
+  return (
+    <Select
+      size="small"
+      value={displayValue}
+      onChange={(e) => {
+        const v = e.target.value as string;
+        applyValue({ ...item, value: v === "" ? "" : v === "true" });
+      }}
+      displayEmpty
+      fullWidth
+    >
+      <MenuItem value="">All</MenuItem>
+      <MenuItem value="true">True</MenuItem>
+      <MenuItem value="false">False</MenuItem>
+    </Select>
+  );
+}
+
 export function TagsFilterInput(props: GridFilterInputValueProps) {
   const { resolveLabel } = useI18n();
   const valueArray = Array.isArray(props.item.value) ? (props.item.value as unknown[]) : [];

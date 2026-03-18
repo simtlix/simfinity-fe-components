@@ -1,6 +1,8 @@
 // Client-side components and hooks
 export { default as EntityForm } from './EntityForm';
 export { default as EntityTable } from './EntityTable';
+export { default as EntityCardList } from './EntityCardList';
+export { default as StandaloneFilterPanel } from './StandaloneFilterPanel';
 export { default as FormFieldRenderer } from './FormFieldRenderer';
 export { default as ObjectFieldSelector } from './ObjectFieldSelector';
 export { default as CollectionFieldGrid } from './CollectionFieldGrid';
@@ -11,6 +13,7 @@ export { default as ServerToolbar } from './ServerToolbar';
 
 // Hooks
 export { useCollectionState } from './hooks/useCollectionState';
+export { useEntityListState } from './hooks/useEntityListState';
 
 // Library utilities
 export * from './lib/columnRenderers';

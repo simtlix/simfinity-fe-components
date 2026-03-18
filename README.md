@@ -134,6 +134,34 @@ A powerful data grid component with server-side pagination, sorting, and filteri
 - URL state synchronization
 - Responsive design
 
+### EntityCardList
+
+A card-based list view with the same filtering, pagination, and sort capabilities as EntityTable. Each card is rendered via a callback that receives the item and a `reload` function (e.g., to refetch after deleting an item).
+
+```tsx
+<EntityCardList
+  listField="series"
+  renderCard={(item, reload) => (
+    <Card key={item.id}>
+      <CardContent>{item.name}</CardContent>
+      <Button onClick={() => deleteItem(item.id).then(reload)}>Delete</Button>
+    </Card>
+  )}
+  getSearchParams={() => new URLSearchParams(window.location.search)}
+  onSearchParamsChange={(params) => router.replace(`${window.location.pathname}?${params}`)}
+  onNavigate={(path) => router.push(path)}
+  showFilterPanel={true}
+/>
+```
+
+**Features:**
+- Same filtering, pagination, and sort as EntityTable
+- Pagination label uses `grid.pagination.cardsPerPage` (default: "Cards per page:") — override via i18n JSON or `registerFunctionLabels`
+- Built-in filter panel (StandaloneFilterPanel) and sort dropdown
+- URL state synchronization for sharing
+- `renderCard(item, reload, onNavigate?)` — `reload` triggers list refetch; `onNavigate` (when provided) includes returnTo for form Cancel/Success
+- `showFilterPanel` — set to `false` when using external filter UI
+
 ### EntityForm
 
 Automatically generates forms from GraphQL schema with full CRUD operations.
@@ -144,6 +172,7 @@ Automatically generates forms from GraphQL schema with full CRUD operations.
   action="create"                            // "create" | "edit" | "view"
   entityId="123"                             // Required for edit/view modes
   onNavigate={(path) => router.push(path)}   // Optional: custom navigation
+  returnTo="/entities/series?page=2"         // Optional: where to go on Cancel/Success
 />
 ```
 
@@ -154,6 +183,7 @@ Automatically generates forms from GraphQL schema with full CRUD operations.
 - State machine integration
 - Form customization support
 - Breadcrumb navigation
+- `returnTo` — when provided, Cancel and default Success navigate here instead of the entity list (EntityTable and EntityCardList pass this via URL when opening forms)
 
 ### CollectionFieldGrid
 
@@ -203,6 +233,33 @@ Generic component for rendering any form field type. Uses the `SimfinityClient` 
 ## React Hooks
 
 The library provides data-fetching hooks that wrap the `SimfinityClient` imperative API in reactive React hooks:
+
+### useEntityListState
+
+Manages URL-synced pagination, sort, and filter state for list views. Used internally by EntityTable and EntityCardList; also available for custom list UIs.
+
+```tsx
+import { useEntityListState } from '@simtlix/simfinity-fe-components';
+
+const {
+  page,
+  setPage,
+  rowsPerPage,
+  setRowsPerPage,
+  sortModel,
+  setSortModel,
+  filterModel,
+  setFilterModel,
+  pendingFilterModel,
+  setPendingFilterModel,
+  filterItems,
+  sortTerms,
+  updateURL,
+} = useEntityListState({
+  getSearchParams: () => new URLSearchParams(window.location.search),
+  onSearchParamsChange: (params) => window.history.replaceState({}, '', `?${params}`),
+});
+```
 
 ### useSimfinityClient
 
@@ -505,7 +562,9 @@ Or use JSON labels in `public/i18n/en.json`:
   "form.edit": "Edit Series",
   "actions.view": "View",
   "actions.edit": "Edit",
-  "actions.delete": "Delete"
+  "actions.delete": "Delete",
+  "grid.pagination.rowsPerPage": "Rows per page:",
+  "grid.pagination.cardsPerPage": "Cards per page:"
 }
 ```
 
@@ -618,6 +677,17 @@ import {
 | `onNavigate` | `(path: string) => void` | No | Custom navigation function |
 | `getSearchParams` | `() => URLSearchParams` | No | Custom URL params getter |
 | `onSearchParamsChange` | `(params: URLSearchParams) => void` | No | Custom URL params updater |
+
+### EntityCardList Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `listField` | `string` | Yes | GraphQL list field name |
+| `renderCard` | `(item: T, reload: () => void) => React.ReactNode` | Yes | Renders each card; `reload` refetches the list |
+| `getSearchParams` | `() => URLSearchParams` | No | Custom URL params getter |
+| `onSearchParamsChange` | `(params: URLSearchParams) => void` | No | Custom URL params updater |
+| `onNavigate` | `(path: string) => void` | No | Custom navigation function |
+| `showFilterPanel` | `boolean` | No | Show built-in filter panel (default: true) |
 
 ### EntityForm Props
 

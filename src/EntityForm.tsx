@@ -52,6 +52,7 @@ type EntityFormProps = {
   entityId?: string;
   action: "create" | "edit" | "view";
   onNavigate?: (path: string) => void;
+  returnTo?: string;
 };
 
 type FormField = {
@@ -129,7 +130,8 @@ function processEmbeddedObjectFieldsFromClient(
     .filter((field): field is NonNullable<typeof field> => field !== null);
 }
 
-export default function EntityForm({ listField, entityId, action, onNavigate }: EntityFormProps) { 
+export default function EntityForm({ listField, entityId, action, onNavigate, returnTo }: EntityFormProps) { 
+  const backPath = returnTo ?? `/entities/${listField}`;
   const navigate = React.useCallback((path: string) => {
     if (onNavigate) { onNavigate(path); }
     else if (typeof window !== 'undefined') { window.location.href = path; }
@@ -595,14 +597,14 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
         } else if (successResult.action) {
           successResult.action();
         } else {
-          setTimeout(() => navigate(`/entities/${listField}`), 1500);
+          setTimeout(() => navigate(backPath), 1500);
         }
       } else {
         const defaultMessage = action === "create" 
           ? resolveLabel(["form.successCreated"], { entity: listField }, "Entity created successfully!")
           : resolveLabel(["form.successUpdated"], { entity: listField }, "Entity updated successfully!");
         setSuccessMessage(defaultMessage);
-        setTimeout(() => navigate(`/entities/${listField}`), 1500);
+        setTimeout(() => navigate(backPath), 1500);
       }
     } catch (err: unknown) {
       if (callbacks?.onError) {
@@ -889,7 +891,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
   return (
     <Box sx={{ p: 3 }}>
       <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 3 }}>
-        <Link href={`/entities/${listField}`} color="inherit">
+        <Link component="button" variant="body2" onClick={() => navigate(backPath)} color="inherit" sx={{ cursor: "pointer", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>
           {resolveLabel([getEntityName(listField, 'plural')], { entity: listField }, getEntityName(listField, 'plural'))}
         </Link>
         <Typography color="text.primary">
@@ -913,7 +915,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate }: 
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button variant="outlined" onClick={() => navigate(`/entities/${listField}`)}>
+          <Button variant="outlined" onClick={() => navigate(backPath)}>
             {resolveLabel(["form.cancel"], { entity: listField }, "Cancel")}
           </Button>
           
