@@ -36,6 +36,7 @@ import {
   FormCustomizationState, 
   FormCustomizationActions, 
   createFormCustomizationState,
+  getFormCustomization,
   getFieldSize,
   isFieldVisible,
   isFieldEnabled,
@@ -80,6 +81,7 @@ type FormField = {
   connectionField?: string;
   isStateMachine?: boolean;
   isReadOnly?: boolean;
+  isVirtualTransient?: boolean;
 };
 
 type FormData = Record<string, FormField>;
@@ -257,7 +259,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate, re
       }
     });
 
-    return filteredFields.map(field => {
+    const schemaFields = filteredFields.map(field => {
       const unwrapped = field.type;
       const typeName = unwrapped.name || "String";
       const isNumeric = client.isNumericScalar(typeName);
@@ -270,18 +272,20 @@ export default function EntityForm({ listField, entityId, action, onNavigate, re
       const enumValues = isEnum ? client.getEnumValues(typeName) : undefined;
 
       const isObject = unwrapped.kind === "OBJECT" && !isList;
-      const objectTypeName = isObject && typeName ? typeName : undefined;
+      const isEmbedded = field.extensions?.relation?.embedded === true;
+      const isEmbeddedList = isList && unwrapped.kind === "OBJECT" && isEmbedded;
+      const objectTypeName = (isObject || isEmbeddedList) && typeName ? typeName : undefined;
       const descriptionField = isObject
         ? (field.extensions?.relation?.displayField || client.getDisplayField(entityTypeName, field.name) || "name")
         : "name";
 
       const isCollection = isList && unwrapped.kind === "OBJECT";
       const collectionObjectTypeName = isCollection && typeName ? typeName : undefined;
-      let connectionField = isCollection && field.extensions?.relation?.connectionField
+      let connectionField = isCollection && !isEmbedded && field.extensions?.relation?.connectionField
         ? field.extensions.relation.connectionField
         : undefined;
 
-      if (isCollection && !connectionField) {
+      if (isCollection && !isEmbedded && !connectionField) {
         connectionField = entityTypeName.toLowerCase();
       }
 
@@ -294,7 +298,6 @@ export default function EntityForm({ listField, entityId, action, onNavigate, re
       const singleQueryName = queryNames?.singularQueryName ?? objectTypeName;
 
       const isObjectRequired = isObject && isNonNullField(field.rawType);
-      const isEmbedded = field.extensions?.relation?.embedded === true;
       const embeddedFields = isEmbedded && objectTypeName
         ? processEmbeddedObjectFieldsFromClient(client, objectTypeName, field.name)
         : undefined;
@@ -321,11 +324,56 @@ export default function EntityForm({ listField, entityId, action, onNavigate, re
         connectionField,
         isStateMachine: field.extensions?.stateMachine === true,
         isReadOnly: field.extensions?.readOnly === true,
+        isVirtualTransient: false,
         required: isObject ? isObjectRequired : isRequired,
         value: getDefaultValue(typeName || "String", isBoolean, isList, isObject),
         error: undefined,
       };
     }).filter((field): field is NonNullable<typeof field> => field !== null);
+
+    const customization = getFormCustomization(entityTypeName, action);
+    if (customization) {
+      const RESERVED = new Set(['mode', 'steps', 'beforeSubmit', 'onSuccess', 'onError']);
+      const schemaNames = new Set(schemaFields.map(f => f.name));
+      for (const [key, fc] of Object.entries(customization)) {
+        if (RESERVED.has(key) || schemaNames.has(key)) continue;
+        if (
+          typeof fc === 'object' && fc !== null &&
+          'transient' in fc && (fc as { transient?: boolean }).transient === true &&
+          'customRenderer' in fc
+        ) {
+          schemaFields.push({
+            name: key,
+            type: "String",
+            isNumeric: false,
+            isBoolean: false,
+            isDate: false,
+            isList: false,
+            isEnum: false,
+            enumValues: undefined,
+            isObject: false,
+            objectTypeName: undefined,
+            descriptionField: "name",
+            descriptionFieldType: undefined,
+            listQueryName: undefined,
+            singleQueryName: undefined,
+            isEmbedded: false,
+            embeddedFields: undefined,
+            isCollection: false,
+            collectionObjectTypeName: undefined,
+            connectionField: undefined,
+            isStateMachine: false,
+            isReadOnly: false,
+            isVirtualTransient: true,
+            required: false,
+            value: null,
+            error: undefined,
+          });
+        }
+      }
+    }
+
+    return schemaFields;
   }, [client, entityTypeName, action, listField]);
 
   React.useEffect(() => {
@@ -347,15 +395,14 @@ export default function EntityForm({ listField, entityId, action, onNavigate, re
   const fieldSelectionString = React.useMemo(() => {
     if (!formFields.length || !entityTypeName) return null;
     const fieldSelections = formFields
-      .filter(field => !field.isCollection)
+      .filter(field => !field.isVirtualTransient && (!field.isCollection || field.isEmbedded))
       .map(field => {
+        if (field.isEmbedded && field.embeddedFields?.length) {
+          const embeddedFieldNames = field.embeddedFields.map(ef => ef.name.replace(`${field.name}.`, ''));
+          return `${field.name} { ${embeddedFieldNames.join(' ')} }`;
+        }
         if (field.isObject && field.objectTypeName && field.descriptionField) {
-          if (field.isEmbedded) {
-            const embeddedFieldNames = field.embeddedFields?.map(ef => ef.name.replace(`${field.name}.`, '')) || [];
-            return `${field.name} { ${embeddedFieldNames.join(' ')} }`;
-          } else {
-            return `${field.name} { id ${field.descriptionField} }`;
-          }
+          return `${field.name} { id ${field.descriptionField} }`;
         }
         return field.name;
       });
@@ -496,19 +543,26 @@ export default function EntityForm({ listField, entityId, action, onNavigate, re
       const isTransient = typeof fieldCustomization === 'object' && fieldCustomization !== null && 'transient' in fieldCustomization && (fieldCustomization as { transient?: boolean }).transient === true;
       if (isTransient) { transientFields.push(field.name); return; }
 
-      if (field.isCollection || field.isStateMachine || field.isReadOnly) {
+      if ((field.isCollection && !field.isEmbedded) || field.isStateMachine || field.isReadOnly) {
         skipFields.push(field.name);
         return;
       }
 
       if (field.isEmbedded && field.embeddedFields) {
-        const embeddedData: Record<string, unknown> = {};
-        field.embeddedFields.forEach(ef => {
-          if (ef.isReadOnly) return;
-          const efName = ef.name.replace(`${field.name}.`, '');
-          embeddedData[efName] = fd[ef.name]?.value;
-        });
-        rawInput[field.name] = embeddedData;
+        if (field.isList) {
+          const directValue = fd[field.name]?.value;
+          if (directValue !== undefined && directValue !== null) {
+            rawInput[field.name] = directValue;
+          }
+        } else {
+          const embeddedData: Record<string, unknown> = {};
+          field.embeddedFields.forEach(ef => {
+            if (ef.isReadOnly) return;
+            const efName = ef.name.replace(`${field.name}.`, '');
+            embeddedData[efName] = fd[ef.name]?.value;
+          });
+          rawInput[field.name] = embeddedData;
+        }
       } else if (field.isObject) {
         const currentValue = fd[field.name]?.value;
         if (currentValue && typeof currentValue === 'object' && 'id' in currentValue) {
@@ -1086,6 +1140,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate, re
                       {(() => {
                         const collectionFields = formFields.filter(field => {
                           if (!field.isCollection || !field.collectionObjectTypeName || !field.connectionField) return false;
+                          if (field.isEmbedded) return false;
                           const fc = customizationState.customization[field.name];
                           if (typeof fc === 'object' && fc !== null && 'stepId' in fc) return (fc as { stepId?: string }).stepId === currentStepId;
                           return false;
@@ -1198,7 +1253,7 @@ export default function EntityForm({ listField, entityId, action, onNavigate, re
       {(() => {
         const isStepperMode = customizationState.customization.mode === 'stepper';
         if (isStepperMode) return null;
-        const validCollectionFields = formFields.filter(field => field.isCollection && field.collectionObjectTypeName && field.connectionField);
+        const validCollectionFields = formFields.filter(field => field.isCollection && !field.isEmbedded && field.collectionObjectTypeName && field.connectionField);
         return validCollectionFields.map(field => {
           const cc = getCollectionFieldCustomization(customizationState.customization, field.name);
           if (cc?.customCollectionRenderer) {

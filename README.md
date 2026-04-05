@@ -2,6 +2,10 @@
 
 A comprehensive React component library for building dynamic, schema-driven entity management interfaces. Built with `@simtlix/simfinity-js-client` and Material-UI, this package provides powerful components that automatically generate forms and tables from GraphQL schema introspection.
 
+## Documentation
+
+- **[FORM_CUSTOMIZATION_README.md](./FORM_CUSTOMIZATION_README.md)** — Form/stepper/field/transient/collection customization (including schema requirements for transient UI fields and step label i18n).
+
 ## Features
 
 - **Dynamic Form Generation**: Automatically generates forms from GraphQL schema introspection

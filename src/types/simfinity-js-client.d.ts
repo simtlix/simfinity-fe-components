@@ -87,8 +87,12 @@ declare module "@simtlix/simfinity-js-client" {
     exec(): Promise<unknown>;
   }
 
+  export interface SimfinityClientOptions {
+    prepareHeaders?: (headers: Record<string, string>) => void;
+  }
+
   class SimfinityClient {
-    constructor(endpoint: string);
+    constructor(endpoint: string, options?: SimfinityClientOptions);
 
     init(): Promise<void>;
 

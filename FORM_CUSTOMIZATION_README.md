@@ -605,15 +605,20 @@ registerFormCustomization('Series', 'create', {
 
 #### Transient Fields
 
+> **Virtual transient fields:** If a `fieldsCustomization` entry has `transient: true` **and** a `customRenderer`, `EntityForm` automatically injects it as a virtual field even when no matching GraphQL schema field exists. This means you can add section headings, editorial callouts, review summaries, or any UI-only element without touching the backend schema. If the field name *does* match a schema field, the schema field is used as before and simply excluded from mutations. Virtual fields appear in `formData` with `value: null`.
+
 Transient fields are custom fields that are displayed in the form but **not included in mutations**. They're useful for:
-- Calculated/computed fields
+- Section headings, intro copy, and editorial callouts (virtual -- no schema field needed)
+- Calculated/computed fields (backed by a schema field)
 - UI-only controls (filters, toggles, etc.)
 - Temporary user input that affects other fields
+- Review / summary panels in stepper forms
 
 **Requirements:**
 - Must set `transient: true`
 - Must provide a `customRenderer`
 - Field data is available in `formData` but excluded from mutations
+- No backend schema field is required -- the field name can be arbitrary (e.g. `uiBasicIntro`)
 
 ```tsx
 registerFormCustomization('Series', 'create', {
@@ -667,8 +672,11 @@ registerFormCustomization('Series', 'create', {
 **Important Notes:**
 - Transient fields are skipped in `transformFormDataForMutation`
 - They appear in `formData` for use in callbacks and other field logic
-- Perfect for calculated fields, UI controls, and temporary state
+- Perfect for calculated fields, UI controls, temporary state, and UI-only chrome (headings, callouts)
 - Can be used with `onChange` to affect other fields
+- Virtual transient fields (no schema backing) are injected automatically when `transient: true` + `customRenderer` is present and the field name does not exist on the GraphQL type
+
+**Stepper step labels:** In stepper mode, each step’s `stepLabel` is passed to i18n as `resolveLabel([step.stepLabel], { entity: listField }, step.stepLabel)`. Use a **locale JSON key** as `stepLabel` (e.g. `barbershop.step.basic`), not raw English copy.
 
 #### Responsive Field Sizing
 

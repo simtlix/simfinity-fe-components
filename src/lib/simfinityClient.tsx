@@ -8,20 +8,33 @@ import { looksLikeDateTimeField, type ValueResolver, type SchemaData } from "./i
 
 const SimfinityClientContext = React.createContext<SimfinityClient | null>(null);
 
+export type SimfinityClientOptions = {
+  /** Called before each GraphQL request; mutate `headers` to add auth (e.g. Authorization). */
+  prepareHeaders?: (headers: Record<string, string>) => void;
+};
+
 export type SimfinityClientProviderProps = {
   endpoint: string;
   children: React.ReactNode;
   loadingFallback?: React.ReactNode;
   errorFallback?: (error: Error) => React.ReactNode;
+  /** Passed as the second argument to `new SimfinityClient(endpoint, clientOptions)`. */
+  clientOptions?: SimfinityClientOptions;
 };
 
-export function SimfinityClientProvider({ endpoint, children, loadingFallback, errorFallback }: SimfinityClientProviderProps) {
+export function SimfinityClientProvider({ endpoint, children, loadingFallback, errorFallback, clientOptions }: SimfinityClientProviderProps) {
   const [client, setClient] = React.useState<SimfinityClient | null>(null);
   const [initError, setInitError] = React.useState<Error | null>(null);
+  const clientOptionsRef = React.useRef(clientOptions);
+  clientOptionsRef.current = clientOptions;
 
   React.useEffect(() => {
     let cancelled = false;
-    const c = new SimfinityClient(endpoint);
+    const c = new SimfinityClient(endpoint, {
+      prepareHeaders(headers) {
+        clientOptionsRef.current?.prepareHeaders?.(headers);
+      },
+    });
     c.init()
       .then(() => { if (!cancelled) setClient(c); })
       .catch((err: unknown) => { if (!cancelled) setInitError(err instanceof Error ? err : new Error(String(err))); });
